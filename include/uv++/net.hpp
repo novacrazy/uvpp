@@ -68,6 +68,57 @@ namespace uv {
             }
         };
 
+        inline void ip4_addr( const std::string &ip, int port, sockaddr_in *addr ) {
+            assert( addr != nullptr );
+
+            int res = uv_ip4_addr( ip.c_str(), port, addr );
+
+            if( res != 0 ) {
+                throw ::uv::Exception( res );
+            }
+        }
+
+        inline sockaddr_in ip4_addr( const std::string &ip, int port ) {
+            sockaddr_in tmp;
+            ip4_addr( ip, port, &tmp );
+            return tmp;
+        }
+
+        inline void ip6_addr( const std::string &ip, int port, sockaddr_in6 *addr ) {
+            assert( addr != nullptr );
+
+            int res = uv_ip6_addr( ip.c_str(), port, addr );
+
+            if( res != 0 ) {
+                throw ::uv::Exception( res );
+            }
+        }
+
+        inline sockaddr_in6 ip6_addr( const std::string &ip, int port ) {
+            sockaddr_in6 tmp;
+            ip6_addr( ip, port, &tmp );
+            return tmp;
+        }
+
+        inline void ip_addr( const std::string &ip, int port, address_t *addr ) {
+            assert( addr != nullptr );
+
+            auto af = ip.find( ':' ) == std::string::npos ? AF_INET : AF_INET6;
+
+            if( af == AF_INET ) {
+                ip4_addr( ip, port, &addr->address4 );
+
+            } else {
+                ip6_addr( ip, port, &addr->address6 );
+            }
+        }
+
+        inline address_t ip_addr( const std::string &ip, int port ) {
+            address_t tmp;
+            ip_addr( ip, port, &tmp );
+            return tmp;
+        }
+
         std::string ntop( const address_t &address ) {
             auto   af      = address.address4.sin_family;
             size_t len     = af == AF_INET ? INET_ADDRSTRLEN : INET6_ADDRSTRLEN;
