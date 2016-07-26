@@ -12,6 +12,7 @@
 #include <vector>
 #include <array>
 #include <algorithm>
+#include <mutex>
 
 namespace uv {
     namespace os {
@@ -94,17 +95,34 @@ namespace uv {
             return uv_setup_args( argc, argv );
         }
 
+        /*
+         * uv_get_process_title returns UV_ENOBUFS on failure when the supplied buffer is too small, so just allocate
+         * more memory next round if that happens. Maximum buffer sizes are persistent so it probably won't need to
+         * reallocate much after the first time.
+         * */
         std::string process_title() {
             static size_t buffer_size = 16; //Good starting size, will statically increase if needed
 
             int res = 0;
 
             while( true ) {
-                char *buffer = new char[buffer_size + 1];
+                char *buffer = new char[buffer_size];
 
-                res = uv_get_process_title( buffer, buffer_size + 1 );
+                res = uv_get_process_title( buffer, buffer_size );
 
-                if( res == UV_EINVAL ) {
+                if( res == 0 ) {
+                    std::string ret( buffer );
+
+                    delete[] buffer;
+
+                    return std::move( ret );
+
+                } else if( res == UV_ENOBUFS ) {
+                    delete[] buffer;
+
+                    buffer_size *= 2;
+
+                } else {
                     /*
                      * If we received UV_EINVAL, that means either the buffer was null or the buffer_size was
                      * incorrect, so double check it here and delete if necessary
@@ -114,18 +132,6 @@ namespace uv {
                     }
 
                     throw ::uv::Exception( res );
-
-                } else if( res == UV_ENOBUFS ) {
-                    buffer_size *= 2;
-
-                    delete[] buffer;
-
-                } else {
-                    std::string ret( buffer );
-
-                    delete[] buffer;
-
-                    return std::move( ret );
                 }
             }
         }
@@ -138,7 +144,185 @@ namespace uv {
             }
         }
 
-        size_t resident_set_memory() {
+        /*
+         * So because this requires a pre-allocated buffer, it may need to reallocate a couple times to
+         * get enough space to store the whole path. Most paths should be fine since the default is MAX_PATH,
+         * but some utf8 long path might need larger buffers.
+         *
+         * Luckily, uv_cwd sets the buffer_size pointer to the correct value on failure, so we know exactly how much
+         * needs to be allocated the next round.
+         * */
+        std::string cwd() {
+            size_t buffer_size = 260; //MAX_PATH on Windows
+
+            int res = 0;
+
+            while( true ) {
+                char *buffer = new char[buffer_size];
+
+                res = uv_cwd( buffer, &buffer_size );
+
+                if( res == 0 ) {
+                    std::string ret( buffer, buffer_size );
+
+                    delete[] buffer;
+
+                    return std::move( ret );
+
+                } else if( res == UV_ENOBUFS ) {
+                    /*
+                     * uv_cwd automatically assigns the new space requirements to buffer_size,
+                     * so we just need to clear this one so it can allocate the correct amount next loop.
+                     * */
+                    delete[] buffer;
+
+                } else {
+                    /*
+                     * If we received UV_EINVAL, that means either the buffer was null or the buffer_size was
+                     * incorrect, so double check it here and delete if necessary
+                     * */
+                    if( buffer != nullptr ) {
+                        delete[] buffer;
+                    }
+
+                    throw ::uv::Exception( res );
+                }
+            }
+        }
+
+        void chdir( const std::string &dir ) {
+            int res = uv_chdir( dir.c_str());
+
+            if( res != 0 ) {
+                throw ::uv::Exception( res );
+            }
+        }
+
+        std::string homedir() {
+            static std::mutex m;
+
+            std::lock_guard<std::mutex> lock( m );
+            size_t                      buffer_size = 260; //MAX_PATH on Windows
+            int                         res         = 0;
+
+            while( true ) {
+                char *buffer = new char[buffer_size];
+
+                res = uv_os_homedir( buffer, &buffer_size );
+
+                if( res == 0 ) {
+                    std::string ret( buffer, buffer_size );
+
+                    delete[] buffer;
+
+                    return std::move( ret );
+
+                } else if( res == UV_ENOBUFS ) {
+                    /*
+                     * uv_cwd automatically assigns the new space requirements to buffer_size,
+                     * so we just need to clear this one so it can allocate the correct amount next loop.
+                     * */
+                    delete[] buffer;
+
+                } else {
+                    /*
+                     * If we received UV_EINVAL, that means either the buffer was null or the buffer_size was
+                     * incorrect, so double check it here and delete if necessary
+                     * */
+                    if( buffer != nullptr ) {
+                        delete[] buffer;
+                    }
+
+                    throw ::uv::Exception( res );
+                }
+            }
+        }
+
+        std::string tmpdir() {
+            static std::mutex m;
+
+            std::lock_guard<std::mutex> lock( m );
+            size_t                      buffer_size = 260; //MAX_PATH on Windows
+            int                         res         = 0;
+
+            while( true ) {
+                char *buffer = new char[buffer_size];
+
+                res = uv_os_tmpdir( buffer, &buffer_size );
+
+                if( res == 0 ) {
+                    std::string ret( buffer, buffer_size );
+
+                    delete[] buffer;
+
+                    return std::move( ret );
+
+                } else if( res == UV_ENOBUFS ) {
+                    /*
+                     * uv_cwd automatically assigns the new space requirements to buffer_size,
+                     * so we just need to clear this one so it can allocate the correct amount next loop.
+                     * */
+                    delete[] buffer;
+
+                } else {
+                    /*
+                     * If we received UV_EINVAL, that means either the buffer was null or the buffer_size was
+                     * incorrect, so double check it here and delete if necessary
+                     * */
+                    if( buffer != nullptr ) {
+                        delete[] buffer;
+                    }
+
+                    throw ::uv::Exception( res );
+                }
+            }
+        }
+
+        /*
+         * Unlike uv_cwd or uv_get_process_title, uv_exepath gives NO INDICATION that the supplied buffer was too small.
+         *
+         * So we literally just have to keep increasing the buffer size until the two strings are equal to each other,
+         * because that would mean the path length has been reached.
+         * */
+        std::string exepath() {
+            static size_t buffer_hint = 260; //MAX_PATH on Windows
+
+            size_t buffer_size = buffer_hint;
+
+            int res = 0;
+
+            bool same_flag = false;
+
+            std::string result;
+
+            while( !same_flag ) {
+                char *buffer = new char[buffer_size];
+
+                res = uv_exepath( buffer, &buffer_size );
+
+                if( res != 0 ) {
+                    delete[] buffer;
+
+                    throw ::uv::Exception( res );
+
+                } else if( result.compare( 0, buffer_size, buffer ) == 0 ) {
+                    same_flag = true;
+
+                } else {
+                    result = std::move( std::string( buffer, buffer_size ));
+
+                    buffer_size *= 2;
+
+                    buffer_hint = buffer_size;
+                }
+
+                delete[] buffer;
+            }
+
+            return result;
+        }
+
+        size_t rss_memory() {
             size_t rss;
 
             int res = uv_resident_set_memory( &rss );
@@ -161,6 +345,14 @@ namespace uv {
 
             return u;
         }
+
+        std::array<double, 3> loadavg() {
+            std::array<double, 3> result;
+
+            uv_loadavg( result.data());
+
+            return std::move( result );
+        };
 
         rusage_t rusage() {
             rusage_t u;

@@ -23,6 +23,12 @@ namespace uv {
     class Loop;
 
     class Timer;
+
+    class Async;
+
+    class Filesystem;
+
+    class File;
 }
 
 #endif //UV_FWD_HPP

@@ -22,9 +22,9 @@ namespace uv {
     template <typename H>
     class HandleBase : public std::enable_shared_from_this<HandleBase<H>> {
         public:
-            typedef H handle_type;
+            typedef H handle_t;
 
-            enum class type : std::underlying_type<uv_handle_type>::type {
+            enum class handle_type : std::underlying_type<uv_handle_type>::type {
                     UNKNOWN_HANDLE = 0,
 #define XX( uc, lc ) uc,
                     UV_HANDLE_TYPE_MAP( XX )
@@ -47,9 +47,9 @@ namespace uv {
         public:
             HandleBase() : internal_data( this ) {}
 
-            virtual const handle_type *handle() const = 0;
+            virtual const handle_t *handle() const = 0;
 
-            virtual handle_type *handle() = 0;
+            virtual handle_t *handle() = 0;
 
             virtual void stop() = 0;
 
@@ -74,8 +74,8 @@ namespace uv {
                 return std::static_pointer_cast<R>( p->user_data );
             }
 
-            type guess_type() const {
-                return (type)uv_guess_handle( this->handle()->type );
+            handle_type guess_type() const {
+                return (handle_type)uv_guess_handle( this->handle()->type );
             }
     };
 
@@ -85,7 +85,7 @@ namespace uv {
             uv_loop_t *loop;
 
         public:
-            typedef typename HandleBase<H>::handle_type handle_type;
+            typedef typename HandleBase<H>::handle_t handle_t;
 
             inline void init( Loop *l );
 
@@ -109,7 +109,7 @@ namespace uv {
 
     class Idle : public Handle<uv_idle_t> {
         public:
-            typedef typename Handle<uv_idle_t>::handle_type handle_type;
+            typedef typename Handle<uv_idle_t>::handle_t handle_t;
 
         private:
             uv_idle_t _handle;
@@ -133,11 +133,11 @@ namespace uv {
                 } );
             }
 
-            inline const handle_type *handle() const {
+            inline const handle_t *handle() const {
                 return &_handle;
             }
 
-            inline handle_type *handle() {
+            inline handle_t *handle() {
                 return &_handle;
             }
 
@@ -149,7 +149,7 @@ namespace uv {
     class Prepare : public Handle<uv_prepare_t> {
         public:
         public:
-            typedef typename Handle<uv_prepare_t>::handle_type handle_type;
+            typedef typename Handle<uv_prepare_t>::handle_t handle_t;
 
         private:
             uv_prepare_t _handle;
@@ -177,18 +177,18 @@ namespace uv {
                 uv_prepare_stop( &_handle );
             }
 
-            inline const handle_type *handle() const {
+            inline const handle_t *handle() const {
                 return &_handle;
             }
 
-            inline handle_type *handle() {
+            inline handle_t *handle() {
                 return &_handle;
             }
     };
 
     class Check : public Handle<uv_check_t> {
         public:
-            typedef typename Handle<uv_check_t>::handle_type handle_type;
+            typedef typename Handle<uv_check_t>::handle_t handle_t;
 
         private:
             uv_check_t _handle;
@@ -212,11 +212,11 @@ namespace uv {
                 } );
             }
 
-            inline const handle_type *handle() const {
+            inline const handle_t *handle() const {
                 return &_handle;
             }
 
-            inline handle_type *handle() {
+            inline handle_t *handle() {
                 return &_handle;
             }
 
@@ -227,7 +227,7 @@ namespace uv {
 
     class Timer : public Handle<uv_timer_t> {
         public:
-            typedef typename Handle<uv_timer_t>::handle_type handle_type;
+            typedef typename Handle<uv_timer_t>::handle_t handle_t;
 
         private:
             uv_timer_t _handle;
@@ -258,11 +258,11 @@ namespace uv {
                 );
             }
 
-            inline const handle_type *handle() const {
+            inline const handle_t *handle() const {
                 return &_handle;
             }
 
-            inline handle_type *handle() {
+            inline handle_t *handle() {
                 return &_handle;
             }
 
@@ -273,7 +273,7 @@ namespace uv {
 
     class Async : public Handle<uv_async_t> {
         public:
-            typedef typename Handle<uv_async_t>::handle_type handle_type;
+            typedef typename Handle<uv_async_t>::handle_t handle_t;
 
         private:
             uv_async_t _handle;
@@ -296,11 +296,11 @@ namespace uv {
                 uv_async_send( &_handle );
             }
 
-            inline const handle_type *handle() const {
+            inline const handle_t *handle() const {
                 return &_handle;
             }
 
-            inline handle_type *handle() {
+            inline handle_t *handle() {
                 return &_handle;
             }
 
@@ -316,7 +316,7 @@ namespace uv {
 
     template <typename D>
     struct HandleHash {
-        typedef HandleBase<typename D::handle_type> *argument_type;
+        typedef HandleBase<typename D::handle_t> *argument_type;
         typedef std::size_t                         result_type;
 
         result_type operator()( argument_type const &h ) const {

@@ -10,6 +10,7 @@
 #include "fwd.hpp"
 
 #include "handle.hpp"
+#include "fs.hpp"
 
 #include <future>
 #include <mutex>
@@ -24,14 +25,18 @@
 namespace uv {
     class Loop : public HandleBase<uv_loop_t> {
         public:
-            typedef typename HandleBase<uv_loop_t>::handle_type handle_type;
+            typedef typename HandleBase<uv_loop_t>::handle_t handle_t;
 
             template <typename H>
             friend
             class Handle;
 
+            friend class Filesystem;
+
         private:
             uv_loop_t loop;
+
+            Filesystem _fs;
 
             std::atomic_bool loop_stopped;
 
@@ -52,17 +57,21 @@ namespace uv {
                     WAIT_ON_CLOSE
             };
 
-            inline const handle_type *handle() const {
+            inline const handle_t *handle() const {
                 return &loop;
             }
 
-            inline handle_type *handle() {
+            inline handle_t *handle() {
                 return &loop;
             }
 
-            inline Loop() {
+            inline Loop() : _fs( this ) {
                 this->_initData();
                 this->_init( this->handle());
+            }
+
+            inline Filesystem *fs() {
+                return &_fs;
             }
 
             inline int run( uv_run_mode mode = UV_RUN_DEFAULT ) {
@@ -210,12 +219,11 @@ namespace uv {
                 return this->timer( f, timeout, repeat );
             }
 
-            template <typename Functor, typename _Rep, typename _Period>
+            template <typename Functor, typename _Rep, typename _Period, typename _Rep2, typename _Period2>
             inline std::shared_ptr<Timer> timer( const std::chrono::duration<_Rep, _Period> &timeout,
-                                                 Functor f ) {
-                using namespace std::chrono;
-
-                return this->timer( f, timeout, 0s );
+                                                 Functor f,
+                                                 const std::chrono::duration<_Rep2, _Period2> &repeat = std::chrono::duration_values<_Rep2>::zero()) {
+                return this->timer( f, timeout, repeat );
             }
 
             template <typename Functor>
@@ -288,8 +296,6 @@ namespace uv {
 #undef UV__HANDLE_CLOSING
 #endif
             }
-
-
     };
 
     template <typename H>
@@ -297,6 +303,10 @@ namespace uv {
         this->_initData();
         this->loop = &l->loop;
         this->_init();
+    }
+
+    void Filesystem::init( Loop *l ) {
+        this->loop = &l->loop;
     }
 }
 
