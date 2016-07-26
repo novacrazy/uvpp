@@ -94,23 +94,28 @@ namespace uv {
             return result;
         }
 
-        address_t pton( const std::string &address ) {
-            address_t tmp;
-            auto      af = address.find( ':' ) == std::string::npos ? AF_INET : AF_INET6;
-            int       res;
+        void pton( const std::string &address, address_t *target ) {
+            auto af = address.find( ':' ) == std::string::npos ? AF_INET : AF_INET6;
+            int  res;
 
             if( af == AF_INET ) {
-                res = uv_inet_pton( af, address.c_str(), &tmp.address4.sin_addr );
+                res = uv_inet_pton( af, address.c_str(), &target->address4.sin_addr );
 
             } else {
-                res = uv_inet_pton( af, address.c_str(), &tmp.address6.sin6_addr );
+                res = uv_inet_pton( af, address.c_str(), &target->address6.sin6_addr );
             }
 
             if( res != 0 ) {
                 throw ::uv::Exception( res );
             }
 
-            tmp.address4.sin_family = af;
+            target->address4.sin_family = af;
+        }
+
+        inline address_t pton( const std::string &address ) {
+            address_t tmp;
+
+            pton( address, &tmp );
 
             return tmp;
         }
