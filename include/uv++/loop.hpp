@@ -45,6 +45,8 @@ namespace uv {
 
         protected:
             inline void _init( uv_loop_t *l ) {
+                assert( l != nullptr );
+
                 uv_loop_init( l );
             }
 
@@ -300,12 +302,16 @@ namespace uv {
 
     template <typename H>
     inline void Handle<H>::init( Loop *l ) {
+        assert( l != nullptr );
+
         this->_initData();
         this->loop = &l->loop;
         this->_init();
     }
 
     void Filesystem::init( Loop *l ) {
+        assert( l != nullptr );
+
         this->loop = &l->loop;
     }
 }

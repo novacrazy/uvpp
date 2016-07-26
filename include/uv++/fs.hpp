@@ -19,7 +19,9 @@ namespace uv {
             uv_loop_t *loop;
 
         public:
-            File( uv_loop_t *l ) : loop( l ) {}
+            File( uv_loop_t *l ) : loop( l ) {
+                assert( l != nullptr );
+            }
 
             friend class Filesystem;
 
@@ -40,6 +42,8 @@ namespace uv {
 
         public:
             Filesystem( Loop *l ) {
+                assert( l != nullptr );
+
                 this->init( l );
             }
 

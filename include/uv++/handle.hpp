@@ -16,7 +16,9 @@ namespace uv {
         std::shared_ptr<void> continuation;
         void                  *self;
 
-        HandleData( void *s ) : self( s ) {}
+        HandleData( void *s ) : self( s ) {
+            assert( s != nullptr );
+        }
     };
 
     template <typename H>
@@ -317,7 +319,7 @@ namespace uv {
     template <typename D>
     struct HandleHash {
         typedef HandleBase<typename D::handle_t> *argument_type;
-        typedef std::size_t                         result_type;
+        typedef std::size_t                      result_type;
 
         result_type operator()( argument_type const &h ) const {
             return reinterpret_cast<size_t>(h->handle());

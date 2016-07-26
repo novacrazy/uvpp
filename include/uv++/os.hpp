@@ -54,6 +54,8 @@ namespace uv {
         };
 
         inline char **setup_args( int argc, char **argv ) {
+            assert( argv != nullptr );
+
             return uv_setup_args( argc, argv );
         }
 

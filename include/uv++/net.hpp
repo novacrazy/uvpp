@@ -95,6 +95,8 @@ namespace uv {
         }
 
         void pton( const std::string &address, address_t *target ) {
+            assert( target != nullptr );
+
             auto af = address.find( ':' ) == std::string::npos ? AF_INET : AF_INET6;
             int  res;
 
