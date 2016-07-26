@@ -35,62 +35,6 @@ namespace uv {
             }
         };
 
-        /*
-         * The choice to use std::array was just before iterators are nice. It doesn't really change anything.
-         * */
-        struct interface_address_t {
-            std::string         name;
-            std::array<char, 6> phys_addr;
-            int                 is_internal;
-
-            //Using decltype allows it to copy an anonymous union
-            decltype( uv_interface_address_t().address ) address;
-            decltype( uv_interface_address_t().netmask ) netmask;
-
-            interface_address_t( const uv_interface_address_t &a )
-                : name( a.name ),
-                  is_internal( a.is_internal ),
-                  address( a.address ),
-                  netmask( a.netmask ) {
-                std::copy( &a.phys_addr[0], &a.phys_addr[phys_addr.size()], phys_addr.begin());
-            }
-
-            inline std::string ipv4_address() const {
-                //255.255.255.255
-                char buffer[15] = { 0 };
-
-                uv_ip4_name( &this->address.address4, buffer, sizeof( buffer ));
-
-                return std::string( buffer );
-            }
-
-            inline bool is_ipv4_address() const {
-                return this->address.address4.sin_family == AF_INET;
-            }
-
-            inline std::string ipv6_address() const {
-                /*
-                 * 0000.0000.0000.0000.0000.0000.0000.0000
-                 *
-                 * The buffer is 45 characters just in case libuv supports IPv4-mapped IPv6 addresses.
-                 * See here: http://stackoverflow.com/a/1076755
-                 * */
-                char buffer[45] = { 0 };
-
-                uv_ip6_name( &this->address.address6, buffer, sizeof( buffer ));
-
-                return std::string( buffer );
-            }
-
-            inline bool is_ipv6_address() const {
-                return this->address.address4.sin_family == AF_INET6;
-            }
-
-            inline std::string ip_address() const {
-                return this->is_ipv4_address() ? this->ipv4_address() : this->ipv6_address();
-            }
-        };
-
         struct passwd_t {
             std::string username;
             long        uid;
@@ -403,23 +347,6 @@ namespace uv {
             uv_free_cpu_info( cpus, count );
 
             return c;
-        }
-
-        std::vector<interface_address_t> interface_addresses() {
-            uv_interface_address_t *addresses;
-            int                    count;
-
-            int res = uv_interface_addresses( &addresses, &count );
-
-            if( res != 0 ) {
-                throw ::uv::Exception( res );
-            }
-
-            std::vector<interface_address_t> a( &addresses[0], &addresses[count] );
-
-            uv_free_interface_addresses( addresses, count );
-
-            return a;
         }
 
         passwd_t passwd() {
