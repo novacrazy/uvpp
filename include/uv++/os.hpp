@@ -309,7 +309,7 @@ namespace uv {
                     same_flag = true;
 
                 } else {
-                    result = std::move( std::string( buffer, buffer_size ));
+                    result = std::string( buffer, buffer_size );
 
                     buffer_size *= 2;
 
