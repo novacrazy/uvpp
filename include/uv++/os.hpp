@@ -91,6 +91,24 @@ namespace uv {
             }
         };
 
+        struct passwd_t {
+            std::string username;
+            long        uid;
+            long        gid;
+            std::string shell;
+            std::string homedir;
+
+            passwd_t( const uv_passwd_t &psw )
+                : username( psw.username ),
+                  uid( psw.uid ),
+                  gid( psw.gid ),
+                  homedir( psw.homedir ) {
+                if( psw.shell != nullptr ) {
+                    this->shell = psw.shell;
+                }
+            }
+        };
+
         inline char **setup_args( int argc, char **argv ) {
             return uv_setup_args( argc, argv );
         }
@@ -334,6 +352,10 @@ namespace uv {
             return rss;
         }
 
+        inline uint64_t total_memory() {
+            return uv_get_total_memory();
+        }
+
         double uptime() {
             double u;
 
@@ -400,6 +422,40 @@ namespace uv {
             return std::move( a );
         }
 
+        passwd_t passwd() {
+            uv_passwd_t uv_psw;
+
+            int res = uv_os_get_passwd( &uv_psw );
+
+            if( res != 0 ) {
+                throw ::uv::Exception( res );
+            }
+
+            passwd_t psw( uv_psw );
+
+            uv_os_free_passwd( &uv_psw );
+
+            return std::move( psw );
+        }
+
+        /*
+         * Doesn't copy shell or homedir
+         * */
+        std::string username() {
+            uv_passwd_t uv_psw;
+
+            int res = uv_os_get_passwd( &uv_psw );
+
+            if( res != 0 ) {
+                throw ::uv::Exception( res );
+            }
+
+            std::string u = uv_psw.username;
+
+            uv_os_free_passwd( &uv_psw );
+
+            return std::move( u );
+        }
     }
 }
 
