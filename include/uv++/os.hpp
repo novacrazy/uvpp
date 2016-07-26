@@ -133,7 +133,7 @@ namespace uv {
 
                     delete[] buffer;
 
-                    return std::move( ret );
+                    return ret;
 
                 } else if( res == UV_ENOBUFS ) {
                     delete[] buffer;
@@ -185,7 +185,7 @@ namespace uv {
 
                     delete[] buffer;
 
-                    return std::move( ret );
+                    return ret;
 
                 } else if( res == UV_ENOBUFS ) {
                     /*
@@ -233,7 +233,7 @@ namespace uv {
 
                     delete[] buffer;
 
-                    return std::move( ret );
+                    return ret;
 
                 } else if( res == UV_ENOBUFS ) {
                     /*
@@ -273,7 +273,7 @@ namespace uv {
 
                     delete[] buffer;
 
-                    return std::move( ret );
+                    return ret;
 
                 } else if( res == UV_ENOBUFS ) {
                     /*
@@ -373,7 +373,7 @@ namespace uv {
 
             uv_loadavg( result.data());
 
-            return std::move( result );
+            return result;
         };
 
         rusage_t rusage() {
@@ -385,7 +385,7 @@ namespace uv {
                 throw ::uv::Exception( res );
             }
 
-            return std::move( u );
+            return u;
         }
 
         std::vector<cpu_info_t> cpu_info() {
@@ -402,7 +402,7 @@ namespace uv {
 
             uv_free_cpu_info( cpus, count );
 
-            return std::move( c );
+            return c;
         }
 
         std::vector<interface_address_t> interface_addresses() {
@@ -419,7 +419,7 @@ namespace uv {
 
             uv_free_interface_addresses( addresses, count );
 
-            return std::move( a );
+            return a;
         }
 
         passwd_t passwd() {
@@ -435,7 +435,7 @@ namespace uv {
 
             uv_os_free_passwd( &uv_psw );
 
-            return std::move( psw );
+            return psw;
         }
 
         /*
@@ -454,7 +454,7 @@ namespace uv {
 
             uv_os_free_passwd( &uv_psw );
 
-            return std::move( u );
+            return u;
         }
     }
 }
