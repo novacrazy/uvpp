@@ -7,6 +7,7 @@
 
 #include "uv++/loop.hpp"
 #include "uv++/os.hpp"
+#include "uv++/net.hpp"
 #include "uv++/misc.hpp"
 
 #endif //UV_UV_HPP
