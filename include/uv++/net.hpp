@@ -13,6 +13,13 @@
 #include <array>
 #include <algorithm>
 
+#ifdef UV_OVERLOAD_OSTREAM
+
+#include <ostream>
+#include <iomanip>
+
+#endif
+
 namespace uv {
     namespace net {
 
@@ -68,7 +75,7 @@ namespace uv {
             }
         };
 
-        inline void ip4_addr( const std::string &ip, int port, sockaddr_in *addr ) {
+        inline void set_ip4_addr( sockaddr_in *addr, const std::string &ip, int port ) {
             assert( addr != nullptr );
 
             int res = uv_ip4_addr( ip.c_str(), port, addr );
@@ -80,11 +87,11 @@ namespace uv {
 
         inline sockaddr_in ip4_addr( const std::string &ip, int port ) {
             sockaddr_in tmp;
-            ip4_addr( ip, port, &tmp );
+            set_ip4_addr( &tmp, ip, port );
             return tmp;
         }
 
-        inline void ip6_addr( const std::string &ip, int port, sockaddr_in6 *addr ) {
+        inline void set_ip6_addr( sockaddr_in6 *addr, const std::string &ip, int port ) {
             assert( addr != nullptr );
 
             int res = uv_ip6_addr( ip.c_str(), port, addr );
@@ -96,26 +103,26 @@ namespace uv {
 
         inline sockaddr_in6 ip6_addr( const std::string &ip, int port ) {
             sockaddr_in6 tmp;
-            ip6_addr( ip, port, &tmp );
+            set_ip6_addr( &tmp, ip, port );
             return tmp;
         }
 
-        inline void ip_addr( const std::string &ip, int port, address_t *addr ) {
+        inline void set_ip_addr( address_t *addr, const std::string &ip, int port ) {
             assert( addr != nullptr );
 
             auto af = ip.find( ':' ) == std::string::npos ? AF_INET : AF_INET6;
 
             if( af == AF_INET ) {
-                ip4_addr( ip, port, &addr->address4 );
+                set_ip4_addr( &addr->address4, ip, port );
 
             } else {
-                ip6_addr( ip, port, &addr->address6 );
+                set_ip6_addr( &addr->address6, ip, port );
             }
         }
 
         inline address_t ip_addr( const std::string &ip, int port ) {
             address_t tmp;
-            ip_addr( ip, port, &tmp );
+            set_ip_addr( &tmp, ip, port );
             return tmp;
         }
 
@@ -191,5 +198,19 @@ namespace uv {
         }
     }
 }
+
+#ifdef UV_OVERLOAD_OSTREAM
+
+template <typename _Char>
+std::basic_ostream<_Char> &
+operator<<( std::basic_ostream<_Char> &out, const std::vector<uv::net::interface_t> &interfaces ) {
+    for( auto &x : uv::net::interfaces()) {
+        out << std::left << std::setw( INET6_ADDRSTRLEN ) << x.ip_address() << " - " << x.name << std::endl;
+    }
+
+    return out;
+}
+
+#endif
 
 #endif //UV_NET_HPP

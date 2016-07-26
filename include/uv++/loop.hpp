@@ -316,4 +316,15 @@ namespace uv {
     }
 }
 
+#ifdef UV_OVERLOAD_OSTREAM
+
+template <typename _Char>
+std::basic_ostream<_Char> &operator<<( std::basic_ostream<_Char> &out, const uv::Loop &loop ) {
+    loop.print_handles<_Char>( false, out );
+
+    return out;
+}
+
+#endif
+
 #endif //UV_LOOP_HPP
