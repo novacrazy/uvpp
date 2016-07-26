@@ -5,8 +5,8 @@
 #ifndef UV_UV_HPP
 #define UV_UV_HPP
 
-#include "loop.hpp"
-#include "os.hpp"
-#include "misc.hpp"
+#include "uv++/loop.hpp"
+#include "uv++/os.hpp"
+#include "uv++/misc.hpp"
 
 #endif //UV_UV_HPP
