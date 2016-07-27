@@ -22,6 +22,10 @@
 #include <iostream>
 #include <iomanip>
 
+#ifndef UV_DEFAULT_LOOP_SLEEP
+#define UV_DEFAULT_LOOP_SLEEP 1ms
+#endif
+
 namespace uv {
     class Loop : public HandleBase<uv_loop_t> {
         public:
@@ -96,7 +100,7 @@ namespace uv {
             inline void run_forever() {
                 using namespace std::chrono_literals;
 
-                this->run_forever( 1ms );
+                this->run_forever( UV_DEFAULT_LOOP_SLEEP );
             }
 
             inline void start() {
