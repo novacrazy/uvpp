@@ -12,8 +12,8 @@
 #include <string>
 #include <algorithm>
 
-#ifndef __MINGW32__
-#define UV_HAS_STRSIGNAL
+#if !defined( UV_NO_HAS_STRSIGNAL ) && defined( __MINGW32__ )
+#define UV_NO_HAS_STRSIGNAL
 #endif
 
 namespace uv {
@@ -34,7 +34,7 @@ namespace uv {
          * If I'm missing any, feel free to open a pull request or just an issue.
          * */
         std::string signame( int signum ) {
-#ifndef UV_HAS_STRSIGNAL
+#ifdef UV_NO_HAS_STRSIGNAL
             const char *signame;
             switch( signum ) {
                 /*
