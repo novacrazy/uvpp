@@ -59,16 +59,16 @@ namespace uv {
                 UV_SIGCASE( SIGABRT )
 #endif
 #ifdef SIGALRM
-                UV_SIGCASE(SIGALRM)
+                UV_SIGCASE( SIGALRM )
 #endif
 #ifdef SIGBUS
-                UV_SIGCASE(SIGBUS)
+                UV_SIGCASE( SIGBUS )
 #endif
 #ifdef SIGCHLD
-                UV_SIGCASE(SIGCHLD)
+                UV_SIGCASE( SIGCHLD )
 #endif
 #ifdef SIGCONT
-                UV_SIGCASE(SIGCONT)
+                UV_SIGCASE( SIGCONT )
 #endif
 #ifdef SIGFPE
                 UV_SIGCASE( SIGFPE )
@@ -86,424 +86,424 @@ namespace uv {
                 UV_SIGCASE( SIGKILL )
 #endif
 #ifdef SIGPIPE
-                UV_SIGCASE(SIGPIPE)
+                UV_SIGCASE( SIGPIPE )
 #endif
 #ifdef SIGPOLL
-                UV_SIGCASE(SIGPOLL)
+                UV_SIGCASE( SIGPOLL )
 #endif
 #ifdef SIGPROF
-                UV_SIGCASE(SIGPROF)
+                UV_SIGCASE( SIGPROF )
 #endif
 #ifdef SIGQUIT
-                UV_SIGCASE(SIGQUIT)
+                UV_SIGCASE( SIGQUIT )
 #endif
 #ifdef SIGSEGV
                 UV_SIGCASE( SIGSEGV )
 #endif
 #ifdef SIGSTOP
-                UV_SIGCASE(SIGSTOP)
+                UV_SIGCASE( SIGSTOP )
 #endif
 #ifdef SIGSYS
-                UV_SIGCASE(SIGSYS)
+                UV_SIGCASE( SIGSYS )
 #endif
 #ifdef SIGTERM
                 UV_SIGCASE( SIGTERM )
 #endif
 #ifdef SIGTRAP
-                UV_SIGCASE(SIGTRAP)
+                UV_SIGCASE( SIGTRAP )
 #endif
 #ifdef SIGTSTP
-                UV_SIGCASE(SIGTSTP)
+                UV_SIGCASE( SIGTSTP )
 #endif
 #ifdef SIGTTIN
-                UV_SIGCASE(SIGTTIN)
+                UV_SIGCASE( SIGTTIN )
 #endif
 #ifdef SIGTTOU
-                UV_SIGCASE(SIGTTOU)
+                UV_SIGCASE( SIGTTOU )
 #endif
 #ifdef SIGUSR1
-                UV_SIGCASE(SIGUSR1)
+                UV_SIGCASE( SIGUSR1 )
 #endif
 #ifdef SIGUSR2
-                UV_SIGCASE(SIGUSR2)
+                UV_SIGCASE( SIGUSR2 )
 #endif
 #ifdef SIGURG
-                UV_SIGCASE(SIGURG)
+                UV_SIGCASE( SIGURG )
 #endif
 #ifdef SIGVTALRM
-                UV_SIGCASE(SIGVTALRM)
+                UV_SIGCASE( SIGVTALRM )
 #endif
 #ifdef SIGXCPU
-                UV_SIGCASE(SIGXCPU)
+                UV_SIGCASE( SIGXCPU )
 #endif
 #ifdef SIGXFSZ
-                UV_SIGCASE(SIGXFSZ)
+                UV_SIGCASE( SIGXFSZ )
 #endif
 #ifdef SIGEMT
-                UV_SIGCASE(SIGEMT)
+                UV_SIGCASE( SIGEMT )
 #endif
 #ifdef SIGINFO
-                UV_SIGCASE(SIGINFO)
+                UV_SIGCASE( SIGINFO )
 #endif
 #ifdef SIGPWR
-                UV_SIGCASE(SIGPWR)
+                UV_SIGCASE( SIGPWR )
 #endif
 #ifdef SIGLOST
-                UV_SIGCASE(SIGLOST)
+                UV_SIGCASE( SIGLOST )
 #endif
 #ifdef SIGWINCH
                 UV_SIGCASE( SIGWINCH )
 #endif
 #ifdef SIGIOT
-                UV_SIGCASE(SIGIOT)
+                UV_SIGCASE( SIGIOT )
 #endif
 #ifdef SIGCLD
-                UV_SIGCASE(SIGCLD)
+                UV_SIGCASE( SIGCLD )
 #endif
 #ifdef SIGIO
-                UV_SIGCASE(SIGIO)
+                UV_SIGCASE( SIGIO )
 #endif
 #ifdef SIGWIND
-                UV_SIGCASE(SIGWIND)
+                UV_SIGCASE( SIGWIND )
 #endif
 #ifdef SIGPHONE
-                UV_SIGCASE(SIGPHONE)
+                UV_SIGCASE( SIGPHONE )
 #endif
 #ifdef SIGWAITING
-                UV_SIGCASE(SIGWAITING)
+                UV_SIGCASE( SIGWAITING )
 #endif
 #ifdef SIGLWP
-                UV_SIGCASE(SIGLWP)
+                UV_SIGCASE( SIGLWP )
 #endif
 #ifdef SIGDANGER
-                UV_SIGCASE(SIGDANGER)
+                UV_SIGCASE( SIGDANGER )
 #endif
 #ifdef SIGGRANT
-                UV_SIGCASE(SIGGRANT)
+                UV_SIGCASE( SIGGRANT )
 #endif
 #ifdef SIGRETRACT
-                UV_SIGCASE(SIGRETRACT)
+                UV_SIGCASE( SIGRETRACT )
 #endif
 #ifdef SIGMSG
-                UV_SIGCASE(SIGMSG)
+                UV_SIGCASE( SIGMSG )
 #endif
 #ifdef SIGSOUND
-                UV_SIGCASE(SIGSOUND)
+                UV_SIGCASE( SIGSOUND )
 #endif
 #ifdef SIGSAK
-                UV_SIGCASE(SIGSAK)
+                UV_SIGCASE( SIGSAK )
 #endif
 #ifdef SIGPRIO
-                UV_SIGCASE(SIGPRIO)
+                UV_SIGCASE( SIGPRIO )
 #endif
 #ifdef SIG33
-                UV_SIGCASE(SIG33)
+                UV_SIGCASE( SIG33 )
 #endif
 #ifdef SIG34
-                UV_SIGCASE(SIG34)
+                UV_SIGCASE( SIG34 )
 #endif
 #ifdef SIG35
-                UV_SIGCASE(SIG35)
+                UV_SIGCASE( SIG35 )
 #endif
 #ifdef SIG36
-                UV_SIGCASE(SIG36)
+                UV_SIGCASE( SIG36 )
 #endif
 #ifdef SIG37
-                UV_SIGCASE(SIG37)
+                UV_SIGCASE( SIG37 )
 #endif
 #ifdef SIG38
-                UV_SIGCASE(SIG38)
+                UV_SIGCASE( SIG38 )
 #endif
 #ifdef SIG39
-                UV_SIGCASE(SIG39)
+                UV_SIGCASE( SIG39 )
 #endif
 #ifdef SIG40
-                UV_SIGCASE(SIG40)
+                UV_SIGCASE( SIG40 )
 #endif
 #ifdef SIG41
-                UV_SIGCASE(SIG41)
+                UV_SIGCASE( SIG41 )
 #endif
 #ifdef SIG42
-                UV_SIGCASE(SIG42)
+                UV_SIGCASE( SIG42 )
 #endif
 #ifdef SIG43
-                UV_SIGCASE(SIG43)
+                UV_SIGCASE( SIG43 )
 #endif
 #ifdef SIG44
-                UV_SIGCASE(SIG44)
+                UV_SIGCASE( SIG44 )
 #endif
 #ifdef SIG45
-                UV_SIGCASE(SIG45)
+                UV_SIGCASE( SIG45 )
 #endif
 #ifdef SIG46
-                UV_SIGCASE(SIG46)
+                UV_SIGCASE( SIG46 )
 #endif
 #ifdef SIG47
-                UV_SIGCASE(SIG47)
+                UV_SIGCASE( SIG47 )
 #endif
 #ifdef SIG48
-                UV_SIGCASE(SIG48)
+                UV_SIGCASE( SIG48 )
 #endif
 #ifdef SIG49
-                UV_SIGCASE(SIG49)
+                UV_SIGCASE( SIG49 )
 #endif
 #ifdef SIG50
-                UV_SIGCASE(SIG50)
+                UV_SIGCASE( SIG50 )
 #endif
 #ifdef SIG51
-                UV_SIGCASE(SIG51)
+                UV_SIGCASE( SIG51 )
 #endif
 #ifdef SIG52
-                UV_SIGCASE(SIG52)
+                UV_SIGCASE( SIG52 )
 #endif
 #ifdef SIG53
-                UV_SIGCASE(SIG53)
+                UV_SIGCASE( SIG53 )
 #endif
 #ifdef SIG54
-                UV_SIGCASE(SIG54)
+                UV_SIGCASE( SIG54 )
 #endif
 #ifdef SIG55
-                UV_SIGCASE(SIG55)
+                UV_SIGCASE( SIG55 )
 #endif
 #ifdef SIG56
-                UV_SIGCASE(SIG56)
+                UV_SIGCASE( SIG56 )
 #endif
 #ifdef SIG57
-                UV_SIGCASE(SIG57)
+                UV_SIGCASE( SIG57 )
 #endif
 #ifdef SIG58
-                UV_SIGCASE(SIG58)
+                UV_SIGCASE( SIG58 )
 #endif
 #ifdef SIG59
-                UV_SIGCASE(SIG59)
+                UV_SIGCASE( SIG59 )
 #endif
 #ifdef SIG60
-                UV_SIGCASE(SIG60)
+                UV_SIGCASE( SIG60 )
 #endif
 #ifdef SIG61
-                UV_SIGCASE(SIG61)
+                UV_SIGCASE( SIG61 )
 #endif
 #ifdef SIG62
-                UV_SIGCASE(SIG62)
+                UV_SIGCASE( SIG62 )
 #endif
 #ifdef SIG63
-                UV_SIGCASE(SIG63)
+                UV_SIGCASE( SIG63 )
 #endif
 #ifdef SIGCANCEL
-                UV_SIGCASE(SIGCANCEL)
+                UV_SIGCASE( SIGCANCEL )
 #endif
 #ifdef SIG32
-                UV_SIGCASE(SIG32)
+                UV_SIGCASE( SIG32 )
 #endif
 #ifdef SIG64
-                UV_SIGCASE(SIG64)
+                UV_SIGCASE( SIG64 )
 #endif
 #ifdef SIG65
-                UV_SIGCASE(SIG65)
+                UV_SIGCASE( SIG65 )
 #endif
 #ifdef SIG66
-                UV_SIGCASE(SIG66)
+                UV_SIGCASE( SIG66 )
 #endif
 #ifdef SIG67
-                UV_SIGCASE(SIG67)
+                UV_SIGCASE( SIG67 )
 #endif
 #ifdef SIG68
-                UV_SIGCASE(SIG68)
+                UV_SIGCASE( SIG68 )
 #endif
 #ifdef SIG69
-                UV_SIGCASE(SIG69)
+                UV_SIGCASE( SIG69 )
 #endif
 #ifdef SIG70
-                UV_SIGCASE(SIG70)
+                UV_SIGCASE( SIG70 )
 #endif
 #ifdef SIG71
-                UV_SIGCASE(SIG71)
+                UV_SIGCASE( SIG71 )
 #endif
 #ifdef SIG72
-                UV_SIGCASE(SIG72)
+                UV_SIGCASE( SIG72 )
 #endif
 #ifdef SIG73
-                UV_SIGCASE(SIG73)
+                UV_SIGCASE( SIG73 )
 #endif
 #ifdef SIG74
-                UV_SIGCASE(SIG74)
+                UV_SIGCASE( SIG74 )
 #endif
 #ifdef SIG75
-                UV_SIGCASE(SIG75)
+                UV_SIGCASE( SIG75 )
 #endif
 #ifdef SIG76
-                UV_SIGCASE(SIG76)
+                UV_SIGCASE( SIG76 )
 #endif
 #ifdef SIG77
-                UV_SIGCASE(SIG77)
+                UV_SIGCASE( SIG77 )
 #endif
 #ifdef SIG78
-                UV_SIGCASE(SIG78)
+                UV_SIGCASE( SIG78 )
 #endif
 #ifdef SIG79
-                UV_SIGCASE(SIG79)
+                UV_SIGCASE( SIG79 )
 #endif
 #ifdef SIG80
-                UV_SIGCASE(SIG80)
+                UV_SIGCASE( SIG80 )
 #endif
 #ifdef SIG81
-                UV_SIGCASE(SIG81)
+                UV_SIGCASE( SIG81 )
 #endif
 #ifdef SIG82
-                UV_SIGCASE(SIG82)
+                UV_SIGCASE( SIG82 )
 #endif
 #ifdef SIG83
-                UV_SIGCASE(SIG83)
+                UV_SIGCASE( SIG83 )
 #endif
 #ifdef SIG84
-                UV_SIGCASE(SIG84)
+                UV_SIGCASE( SIG84 )
 #endif
 #ifdef SIG85
-                UV_SIGCASE(SIG85)
+                UV_SIGCASE( SIG85 )
 #endif
 #ifdef SIG86
-                UV_SIGCASE(SIG86)
+                UV_SIGCASE( SIG86 )
 #endif
 #ifdef SIG87
-                UV_SIGCASE(SIG87)
+                UV_SIGCASE( SIG87 )
 #endif
 #ifdef SIG88
-                UV_SIGCASE(SIG88)
+                UV_SIGCASE( SIG88 )
 #endif
 #ifdef SIG89
-                UV_SIGCASE(SIG89)
+                UV_SIGCASE( SIG89 )
 #endif
 #ifdef SIG90
-                UV_SIGCASE(SIG90)
+                UV_SIGCASE( SIG90 )
 #endif
 #ifdef SIG91
-                UV_SIGCASE(SIG91)
+                UV_SIGCASE( SIG91 )
 #endif
 #ifdef SIG92
-                UV_SIGCASE(SIG92)
+                UV_SIGCASE( SIG92 )
 #endif
 #ifdef SIG93
-                UV_SIGCASE(SIG93)
+                UV_SIGCASE( SIG93 )
 #endif
 #ifdef SIG94
-                UV_SIGCASE(SIG94)
+                UV_SIGCASE( SIG94 )
 #endif
 #ifdef SIG95
-                UV_SIGCASE(SIG95)
+                UV_SIGCASE( SIG95 )
 #endif
 #ifdef SIG96
-                UV_SIGCASE(SIG96)
+                UV_SIGCASE( SIG96 )
 #endif
 #ifdef SIG97
-                UV_SIGCASE(SIG97)
+                UV_SIGCASE( SIG97 )
 #endif
 #ifdef SIG98
-                UV_SIGCASE(SIG98)
+                UV_SIGCASE( SIG98 )
 #endif
 #ifdef SIG99
-                UV_SIGCASE(SIG99)
+                UV_SIGCASE( SIG99 )
 #endif
 #ifdef SIG100
-                UV_SIGCASE(SIG100)
+                UV_SIGCASE( SIG100 )
 #endif
 #ifdef SIG101
-                UV_SIGCASE(SIG101)
+                UV_SIGCASE( SIG101 )
 #endif
 #ifdef SIG102
-                UV_SIGCASE(SIG102)
+                UV_SIGCASE( SIG102 )
 #endif
 #ifdef SIG103
-                UV_SIGCASE(SIG103)
+                UV_SIGCASE( SIG103 )
 #endif
 #ifdef SIG104
-                UV_SIGCASE(SIG104)
+                UV_SIGCASE( SIG104 )
 #endif
 #ifdef SIG105
-                UV_SIGCASE(SIG105)
+                UV_SIGCASE( SIG105 )
 #endif
 #ifdef SIG106
-                UV_SIGCASE(SIG106)
+                UV_SIGCASE( SIG106 )
 #endif
 #ifdef SIG107
-                UV_SIGCASE(SIG107)
+                UV_SIGCASE( SIG107 )
 #endif
 #ifdef SIG108
-                UV_SIGCASE(SIG108)
+                UV_SIGCASE( SIG108 )
 #endif
 #ifdef SIG109
-                UV_SIGCASE(SIG109)
+                UV_SIGCASE( SIG109 )
 #endif
 #ifdef SIG110
-                UV_SIGCASE(SIG110)
+                UV_SIGCASE( SIG110 )
 #endif
 #ifdef SIG111
-                UV_SIGCASE(SIG111)
+                UV_SIGCASE( SIG111 )
 #endif
 #ifdef SIG112
-                UV_SIGCASE(SIG112)
+                UV_SIGCASE( SIG112 )
 #endif
 #ifdef SIG113
-                UV_SIGCASE(SIG113)
+                UV_SIGCASE( SIG113 )
 #endif
 #ifdef SIG114
-                UV_SIGCASE(SIG114)
+                UV_SIGCASE( SIG114 )
 #endif
 #ifdef SIG115
-                UV_SIGCASE(SIG115)
+                UV_SIGCASE( SIG115 )
 #endif
 #ifdef SIG116
-                UV_SIGCASE(SIG116)
+                UV_SIGCASE( SIG116 )
 #endif
 #ifdef SIG117
-                UV_SIGCASE(SIG117)
+                UV_SIGCASE( SIG117 )
 #endif
 #ifdef SIG118
-                UV_SIGCASE(SIG118)
+                UV_SIGCASE( SIG118 )
 #endif
 #ifdef SIG119
-                UV_SIGCASE(SIG119)
+                UV_SIGCASE( SIG119 )
 #endif
 #ifdef SIG120
-                UV_SIGCASE(SIG120)
+                UV_SIGCASE( SIG120 )
 #endif
 #ifdef SIG121
-                UV_SIGCASE(SIG121)
+                UV_SIGCASE( SIG121 )
 #endif
 #ifdef SIG122
-                UV_SIGCASE(SIG122)
+                UV_SIGCASE( SIG122 )
 #endif
 #ifdef SIG123
-                UV_SIGCASE(SIG123)
+                UV_SIGCASE( SIG123 )
 #endif
 #ifdef SIG124
-                UV_SIGCASE(SIG124)
+                UV_SIGCASE( SIG124 )
 #endif
 #ifdef SIG125
-                UV_SIGCASE(SIG125)
+                UV_SIGCASE( SIG125 )
 #endif
 #ifdef SIG126
-                UV_SIGCASE(SIG126)
+                UV_SIGCASE( SIG126 )
 #endif
 #ifdef SIG127
-                UV_SIGCASE(SIG127)
+                UV_SIGCASE( SIG127 )
 #endif
 #ifdef EXC_BAD_ACCESS
-                UV_SIGCASE(EXC_BAD_ACCESS)
+                UV_SIGCASE( EXC_BAD_ACCESS )
 #endif
 #ifdef EXC_BAD_INSTRUCTION
-                UV_SIGCASE(EXC_BAD_INSTRUCTION)
+                UV_SIGCASE( EXC_BAD_INSTRUCTION )
 #endif
 #ifdef EXC_ARITHMETIC
-                UV_SIGCASE(EXC_ARITHMETIC)
+                UV_SIGCASE( EXC_ARITHMETIC )
 #endif
 #ifdef EXC_EMULATION
-                UV_SIGCASE(EXC_EMULATION)
+                UV_SIGCASE( EXC_EMULATION )
 #endif
 #ifdef EXC_SOFTWARE
-                UV_SIGCASE(EXC_SOFTWARE)
+                UV_SIGCASE( EXC_SOFTWARE )
 #endif
 #ifdef EXC_BREAKPOINT
-                UV_SIGCASE(EXC_BREAKPOINT)
+                UV_SIGCASE( EXC_BREAKPOINT )
 #endif
 #undef UV_SIGCASE
                 default:
