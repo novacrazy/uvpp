@@ -38,7 +38,7 @@ namespace uv {
             friend class Filesystem;
 
         private:
-            uv_loop_t loop;
+            handle_t loop;
 
             Filesystem _fs;
 
@@ -346,14 +346,14 @@ namespace uv {
         assert( l != nullptr );
 
         this->_initData();
-        this->loop = &l->loop;
+        this->loop = l->handle();
         this->_init();
     }
 
     void Filesystem::init( Loop *l ) {
         assert( l != nullptr );
 
-        this->loop = &l->loop;
+        this->loop = l->handle();
     }
 }
 
