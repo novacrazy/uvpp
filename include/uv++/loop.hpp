@@ -238,6 +238,28 @@ namespace uv {
                 return this->timer( f, timeout, repeat );
             }
 
+            template <typename Functor,
+                      typename _Rep, typename _Period,
+                      typename _Rep2 = uint64_t, typename _Period2 = std::milli>
+            inline std::shared_ptr<Timer> repeat( const std::chrono::duration<_Rep, _Period> &repeat,
+                                                  Functor f,
+                                                  const std::chrono::duration<_Rep2, _Period2> &timeout =
+                                                  std::chrono::duration<_Rep2, _Period2>(
+                                                      std::chrono::duration_values<_Rep2>::zero())) {
+                return this->timer( f, timeout, repeat );
+            }
+
+            template <typename Functor,
+                      typename _Rep, typename _Period,
+                      typename _Rep2 = uint64_t, typename _Period2 = std::milli>
+            inline std::shared_ptr<Timer> repeat( Functor f,
+                                                  const std::chrono::duration<_Rep, _Period> &repeat,
+                                                  const std::chrono::duration<_Rep2, _Period2> &timeout =
+                                                  std::chrono::duration<_Rep2, _Period2>(
+                                                      std::chrono::duration_values<_Rep2>::zero())) {
+                return new_handle<Timer>( f, timeout, repeat );
+            }
+
             template <typename... Args>
             inline std::shared_ptr<Async> async( Args &&... args ) {
                 return new_handle<Async>( std::forward<Args>( args )... );
