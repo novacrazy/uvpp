@@ -34,7 +34,7 @@ namespace uv {
          * If I'm missing any, feel free to open a pull request or just an issue.
          * */
         std::string signame( int signum ) {
-#ifndef UV_HAVE_STRSIGNAL
+#ifndef UV_HAS_STRSIGNAL
             const char *signame;
             switch( signum ) {
                 /*
