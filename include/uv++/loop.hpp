@@ -207,24 +207,34 @@ namespace uv {
                 return new_handle<Check>( std::forward<Args>( args )... );
             }
 
-            template <typename Functor, typename _Rep, typename _Period, typename _Rep2, typename _Period2>
+            template <typename Functor,
+                      typename _Rep, typename _Period,
+                      typename _Rep2 = uint64_t, typename _Period2 = std::milli>
             inline std::shared_ptr<Timer> timer( Functor f,
                                                  const std::chrono::duration<_Rep, _Period> &timeout,
-                                                 const std::chrono::duration<_Rep2, _Period2> &repeat = std::chrono::duration_values<_Rep2>::zero()) {
+                                                 const std::chrono::duration<_Rep2, _Period2> &repeat =
+                                                 std::chrono::duration<_Rep2, _Period2>(
+                                                     std::chrono::duration_values<_Rep2>::zero())) {
                 return new_handle<Timer>( f, timeout, repeat );
             }
 
-            template <typename Functor, typename _Rep, typename _Period, typename _Rep2, typename _Period2>
+            template <typename Functor,
+                      typename _Rep, typename _Period,
+                      typename _Rep2, typename _Period2>
             inline std::shared_ptr<Timer> timer( const std::chrono::duration<_Rep, _Period> &timeout,
                                                  const std::chrono::duration<_Rep2, _Period2> &repeat,
                                                  Functor f ) {
                 return this->timer( f, timeout, repeat );
             }
 
-            template <typename Functor, typename _Rep, typename _Period, typename _Rep2, typename _Period2>
+            template <typename Functor,
+                      typename _Rep, typename _Period,
+                      typename _Rep2 = uint64_t, typename _Period2 = std::milli>
             inline std::shared_ptr<Timer> timer( const std::chrono::duration<_Rep, _Period> &timeout,
                                                  Functor f,
-                                                 const std::chrono::duration<_Rep2, _Period2> &repeat = std::chrono::duration_values<_Rep2>::zero()) {
+                                                 const std::chrono::duration<_Rep2, _Period2> &repeat =
+                                                 std::chrono::duration<_Rep2, _Period2>(
+                                                     std::chrono::duration_values<_Rep2>::zero())) {
                 return this->timer( f, timeout, repeat );
             }
 
