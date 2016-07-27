@@ -38,7 +38,7 @@ namespace uv {
 
             Filesystem _fs;
 
-            std::atomic_bool loop_stopped;
+            std::atomic_bool stopped;
 
             typedef std::unordered_set<std::shared_ptr<void>> handle_set_type;
             handle_set_type                                   handle_set;
@@ -77,16 +77,16 @@ namespace uv {
             }
 
             inline int run( uv_run_mode mode = UV_RUN_DEFAULT ) {
-                loop_stopped = false;
+                stopped = false;
 
                 return uv_run( &loop, mode );
             }
 
             template <typename _Rep, typename _Period>
             inline void run_forever( const std::chrono::duration<_Rep, _Period> &delay ) {
-                loop_stopped = false;
+                stopped = false;
 
-                while( !loop_stopped ) {
+                while( !stopped ) {
                     if( !this->run()) {
                         std::this_thread::sleep_for( delay );
                     }
@@ -104,7 +104,7 @@ namespace uv {
             }
 
             inline void stop() {
-                loop_stopped = true;
+                stopped = true;
 
                 uv_stop( &loop );
             }
@@ -192,19 +192,19 @@ namespace uv {
             }
 
         public:
-            template <typename Functor>
-            inline std::shared_ptr<Idle> idle( Functor f ) {
-                return new_handle<Idle>( f );
+            template <typename... Args>
+            inline std::shared_ptr<Idle> idle( Args &&... args ) {
+                return new_handle<Idle>( std::forward<Args>( args )... );
             }
 
-            template <typename Functor>
-            inline std::shared_ptr<Prepare> prepare( Functor f ) {
-                return new_handle<Prepare>( f );
+            template <typename... Args>
+            inline std::shared_ptr<Prepare> prepare( Args &&... args ) {
+                return new_handle<Prepare>( std::forward<Args>( args )... );
             }
 
-            template <typename Functor>
-            inline std::shared_ptr<Check> check( Functor f ) {
-                return new_handle<Check>( f );
+            template <typename... Args>
+            inline std::shared_ptr<Check> check( Args &&... args ) {
+                return new_handle<Check>( std::forward<Args>( args )... );
             }
 
             template <typename Functor, typename _Rep, typename _Period, typename _Rep2, typename _Period2>
@@ -228,9 +228,14 @@ namespace uv {
                 return this->timer( f, timeout, repeat );
             }
 
-            template <typename Functor>
-            inline std::shared_ptr<Async> async( Functor f ) {
-                return new_handle<Async>( f );
+            template <typename... Args>
+            inline std::shared_ptr<Async> async( Args &&... args ) {
+                return new_handle<Async>( std::forward<Args>( args )... );
+            }
+
+            template <typename... Args>
+            inline std::shared_ptr<Signal> signal( Args &&... args ) {
+                return new_handle<Signal>( std::forward<Args>( args )... );
             }
 
             /*

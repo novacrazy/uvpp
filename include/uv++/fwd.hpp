@@ -26,6 +26,8 @@ namespace uv {
 
     class Async;
 
+    class Signal;
+
     class Filesystem;
 
     class File;

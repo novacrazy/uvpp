@@ -8,6 +8,8 @@
 #include "fwd.hpp"
 #include "base.hpp"
 
+#include "detail/handle_detail.hpp"
+
 #include <memory>
 
 namespace uv {
@@ -83,11 +85,22 @@ namespace uv {
 
     template <typename H>
     class Handle : public HandleBase<H> {
+        public:
+            typedef typename HandleBase<H>::handle_t handle_t;
+
         protected:
             uv_loop_t *loop;
 
+            handle_t _handle;
+
         public:
-            typedef typename HandleBase<H>::handle_t handle_t;
+            inline const handle_t *handle() const {
+                return &_handle;
+            }
+
+            inline handle_t *handle() {
+                return &_handle;
+            }
 
             inline void init( Loop *l );
 
@@ -105,16 +118,13 @@ namespace uv {
 
             template <typename Functor>
             void close( Functor f ) {
-
+                //TODO
             }
     };
 
     class Idle : public Handle<uv_idle_t> {
         public:
             typedef typename Handle<uv_idle_t>::handle_t handle_t;
-
-        private:
-            uv_idle_t _handle;
 
         protected:
             inline void _init() {
@@ -135,14 +145,6 @@ namespace uv {
                 } );
             }
 
-            inline const handle_t *handle() const {
-                return &_handle;
-            }
-
-            inline handle_t *handle() {
-                return &_handle;
-            }
-
             inline void stop() {
                 uv_idle_stop( &_handle );
             }
@@ -150,11 +152,7 @@ namespace uv {
 
     class Prepare : public Handle<uv_prepare_t> {
         public:
-        public:
             typedef typename Handle<uv_prepare_t>::handle_t handle_t;
-
-        private:
-            uv_prepare_t _handle;
 
         protected:
             inline void _init() {
@@ -178,22 +176,11 @@ namespace uv {
             inline void stop() {
                 uv_prepare_stop( &_handle );
             }
-
-            inline const handle_t *handle() const {
-                return &_handle;
-            }
-
-            inline handle_t *handle() {
-                return &_handle;
-            }
     };
 
     class Check : public Handle<uv_check_t> {
         public:
             typedef typename Handle<uv_check_t>::handle_t handle_t;
-
-        private:
-            uv_check_t _handle;
 
         protected:
             inline void _init() {
@@ -214,14 +201,6 @@ namespace uv {
                 } );
             }
 
-            inline const handle_t *handle() const {
-                return &_handle;
-            }
-
-            inline handle_t *handle() {
-                return &_handle;
-            }
-
             inline void stop() {
                 uv_check_stop( &_handle );
             }
@@ -230,9 +209,6 @@ namespace uv {
     class Timer : public Handle<uv_timer_t> {
         public:
             typedef typename Handle<uv_timer_t>::handle_t handle_t;
-
-        private:
-            uv_timer_t _handle;
 
         protected:
             inline void _init() {
@@ -255,17 +231,10 @@ namespace uv {
 
                                     static_cast<Continuation<Functor> *>(d->continuation.get())->f( *self );
                                 },
+                                //libuv expects milliseconds, so convert any duration given to milliseconds
                                 std::chrono::duration_cast<millis>( timeout ).count(),
                                 std::chrono::duration_cast<millis>( repeat ).count()
                 );
-            }
-
-            inline const handle_t *handle() const {
-                return &_handle;
-            }
-
-            inline handle_t *handle() {
-                return &_handle;
             }
 
             inline void stop() {
@@ -276,9 +245,6 @@ namespace uv {
     class Async : public Handle<uv_async_t> {
         public:
             typedef typename Handle<uv_async_t>::handle_t handle_t;
-
-        private:
-            uv_async_t _handle;
 
         public:
             template <typename Functor>
@@ -298,14 +264,6 @@ namespace uv {
                 uv_async_send( &_handle );
             }
 
-            inline const handle_t *handle() const {
-                return &_handle;
-            }
-
-            inline handle_t *handle() {
-                return &_handle;
-            }
-
             void stop() {
                 this->stop( []( auto ) {} );
             }
@@ -313,6 +271,38 @@ namespace uv {
             template <typename Functor>
             inline void stop( Functor f ) {
                 this->close( f );
+            }
+    };
+
+    class Signal : public Handle<uv_signal_t> {
+        public:
+            typedef typename Handle<uv_signal_t>::handle_t handle_t;
+
+        protected:
+            void _init() {
+                uv_signal_init( this->loop, &_handle );
+            }
+
+        public:
+            template <typename Functor>
+            inline void start( int signum, Functor f ) {
+                this->internal_data.continuation = std::make_shared<Continuation<Functor>>( f );
+
+                uv_signal_start( &_handle, []( uv_signal_t *h, int sn ) {
+                    HandleData *d = static_cast<HandleData *>(h->data);
+
+                    Signal *self = static_cast<Signal *>(d->self);
+
+                    static_cast<Continuation<Functor> *>(d->continuation.get())->f( *self, sn );
+                }, signum );
+            }
+
+            std::string signame() const {
+                return detail::signame( _handle.signum );
+            }
+
+            inline void stop() {
+                uv_signal_stop( &_handle );
             }
     };
 
