@@ -121,6 +121,17 @@ namespace uv {
             template <typename T>
             inline void dispatch( T *t ) {
                 dispatch_helper<return_type>::dispatch( *this->r, this->f, this->status, t, *p );
+
+                /*
+                 * After dispatch, the status flag will be ASYNC_STATUS_COMPLETED, unless there was a another call to
+                 * send in the time between the callback returning and the dispatch function returning.
+                 *
+                 * I should point out this can happen, and it's a very annoying data race.
+                 * */
+
+                if( this->status == ASYNC_STATUS_COMPLETED ) {
+                    p.reset();
+                }
             }
 
             template <typename... Args>
