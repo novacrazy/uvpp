@@ -11,7 +11,7 @@ namespace uv {
     template <typename>
     class HandleBase;
 
-    template <typename>
+    template <typename, typename>
     class Handle;
 
     class Idle;

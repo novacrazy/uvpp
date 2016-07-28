@@ -6,13 +6,15 @@
 #define UV_HANDLE_HPP
 
 #include "fwd.hpp"
-#include "base.hpp"
+
+#include "defines.hpp"
+#include "exception.hpp"
+#include "type_traits.hpp"
 
 #include "detail/handle_detail.hpp"
 
-#include "type_traits.hpp"
-
 #include <memory>
+#include <future>
 
 namespace uv {
     struct HandleData {
@@ -110,10 +112,11 @@ namespace uv {
             }
     };
 
-    template <typename H>
+    template <typename H, typename D>
     class Handle : public HandleBase<H> {
         public:
             typedef typename HandleBase<H>::handle_t handle_t;
+            typedef D                                derived_type;
 
         protected:
             handle_t _handle;
@@ -140,14 +143,12 @@ namespace uv {
             }
 
             template <typename Functor>
-            void close( Functor f ) {
-                uv_close((uv_handle_t *)( this->handle()), f );
-            }
+            std::shared_future<void> close( Functor );
     };
 
-    class Idle final : public Handle<uv_idle_t> {
+    class Idle final : public Handle<uv_idle_t, Idle> {
         public:
-            typedef typename Handle<uv_idle_t>::handle_t handle_t;
+            typedef typename Handle<uv_idle_t, Idle>::handle_t handle_t;
 
         protected:
             inline void _init() {
@@ -157,14 +158,16 @@ namespace uv {
         public:
             template <typename Functor>
             inline void start( Functor f ) {
-                this->internal_data.continuation = std::make_shared<Continuation<Functor>>( f );
+                typedef detail::Continuation<Functor> Cont;
+
+                this->internal_data.continuation = std::make_shared<Cont>( f );
 
                 uv_idle_start( &_handle, []( uv_idle_t *h ) {
                     HandleData *d = static_cast<HandleData *>(h->data);
 
                     Idle *self = static_cast<Idle *>(d->self);
 
-                    static_cast<Continuation<Functor> *>(d->continuation.get())->f( *self );
+                    static_cast<Cont *>(d->continuation.get())->f( *self );
                 } );
             }
 
@@ -173,9 +176,9 @@ namespace uv {
             }
     };
 
-    class Prepare final : public Handle<uv_prepare_t> {
+    class Prepare final : public Handle<uv_prepare_t, Prepare> {
         public:
-            typedef typename Handle<uv_prepare_t>::handle_t handle_t;
+            typedef typename Handle<uv_prepare_t, Prepare>::handle_t handle_t;
 
         protected:
             inline void _init() {
@@ -185,14 +188,16 @@ namespace uv {
         public:
             template <typename Functor>
             inline void start( Functor f ) {
-                this->internal_data.continuation = std::make_shared<Continuation<Functor>>( f );
+                typedef detail::Continuation<Functor> Cont;
+
+                this->internal_data.continuation = std::make_shared<Cont>( f );
 
                 uv_prepare_start( &_handle, []( uv_prepare_t *h ) {
                     HandleData *d = static_cast<HandleData *>(h->data);
 
                     Prepare *self = static_cast<Prepare *>(d->self);
 
-                    static_cast<Continuation<Functor> *>(d->continuation.get())->f( *self );
+                    static_cast<Cont *>(d->continuation.get())->f( *self );
                 } );
             }
 
@@ -201,9 +206,9 @@ namespace uv {
             }
     };
 
-    class Check final : public Handle<uv_check_t> {
+    class Check final : public Handle<uv_check_t, Check> {
         public:
-            typedef typename Handle<uv_check_t>::handle_t handle_t;
+            typedef typename Handle<uv_check_t, Check>::handle_t handle_t;
 
         protected:
             inline void _init() {
@@ -213,14 +218,16 @@ namespace uv {
         public:
             template <typename Functor>
             inline void start( Functor f ) {
-                this->internal_data.continuation = std::make_shared<Continuation<Functor>>( f );
+                typedef detail::Continuation<Functor> Cont;
+
+                this->internal_data.continuation = std::make_shared<Cont>( f );
 
                 uv_check_start( &_handle, []( uv_check_t *h ) {
                     HandleData *d = static_cast<HandleData *>(h->data);
 
                     Check *self = static_cast<Check *>(d->self);
 
-                    static_cast<Continuation<Functor> *>(d->continuation.get())->f( *self );
+                    static_cast<Cont *>(d->continuation.get())->f( *self );
                 } );
             }
 
@@ -229,9 +236,9 @@ namespace uv {
             }
     };
 
-    class Timer final : public Handle<uv_timer_t> {
+    class Timer final : public Handle<uv_timer_t, Timer> {
         public:
-            typedef typename Handle<uv_timer_t>::handle_t handle_t;
+            typedef typename Handle<uv_timer_t, Timer>::handle_t handle_t;
 
         protected:
             inline void _init() {
@@ -250,14 +257,16 @@ namespace uv {
 
                 typedef std::chrono::duration<uint64_t, std::milli> millis;
 
-                this->internal_data.continuation = std::make_shared<Continuation<Functor>>( f );
+                typedef detail::Continuation<Functor> Cont;
+
+                this->internal_data.continuation = std::make_shared<Cont>( f );
 
                 uv_timer_start( &_handle, []( uv_timer_t *h ) {
                                     HandleData *d = static_cast<HandleData *>(h->data);
 
                                     Check *self = static_cast<Check *>(d->self);
 
-                                    static_cast<Continuation<Functor> *>(d->continuation.get())->f( *self );
+                                    static_cast<Cont *>(d->continuation.get())->f( *self );
                                 },
                     //libuv expects milliseconds, so convert any duration given to milliseconds
                                 std::chrono::duration_cast<millis>( timeout ).count(),
@@ -270,9 +279,9 @@ namespace uv {
             }
     };
 
-    class Signal final : public Handle<uv_signal_t> {
+    class Signal final : public Handle<uv_signal_t, Signal> {
         public:
-            typedef typename Handle<uv_signal_t>::handle_t handle_t;
+            typedef typename Handle<uv_signal_t, Signal>::handle_t handle_t;
 
         protected:
             void _init() {
@@ -282,14 +291,16 @@ namespace uv {
         public:
             template <typename Functor>
             inline void start( int signum, Functor f ) {
-                this->internal_data.continuation = std::make_shared<Continuation<Functor>>( f );
+                typedef detail::Continuation<Functor> Cont;
+
+                this->internal_data.continuation = std::make_shared<Cont>( f );
 
                 uv_signal_start( &_handle, []( uv_signal_t *h, int sn ) {
                     HandleData *d = static_cast<HandleData *>(h->data);
 
                     Signal *self = static_cast<Signal *>(d->self);
 
-                    static_cast<Continuation<Functor> *>(d->continuation.get())->f( *self, sn );
+                    static_cast<Cont *>(d->continuation.get())->f( *self, sn );
                 }, signum );
             }
 
