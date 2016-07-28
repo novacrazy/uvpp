@@ -20,8 +20,8 @@ namespace uv {
                 : Continuation<Functor>( f ) {
             }
 
-            std::shared_ptr <std::promise<return_type>> r;
-            std::shared_ptr <parameter_type>            p;
+            std::shared_ptr<std::promise<return_type>> r;
+            std::shared_ptr<parameter_type>            p;
         };
 
         template <typename Functor, typename P>
@@ -33,7 +33,7 @@ namespace uv {
                 : Continuation<Functor>( f ) {
             }
 
-            std::shared_ptr <parameter_type> p;
+            std::shared_ptr<parameter_type> p;
         };
 
         template <typename Functor, typename R>
@@ -45,7 +45,7 @@ namespace uv {
                 : Continuation<Functor>( f ) {
             }
 
-            std::shared_ptr <std::promise<return_type>> r;
+            std::shared_ptr<std::promise<return_type>> r;
         };
 
         template <typename Functor>
@@ -70,7 +70,7 @@ namespace uv {
 
                 Cont *c = static_cast<Cont *>(d->continuation.get());
 
-                auto self = static_cast<Async <P, R> *>(d->self);
+                auto self = static_cast<Async<P, R> *>(d->self);
 
                 c->f( *self );
             } );
@@ -88,7 +88,7 @@ namespace uv {
 
                 Cont *c = static_cast<Cont *>(d->continuation.get());
 
-                auto self = static_cast<Async <P, R> *>(d->self);
+                auto self = static_cast<Async<P, R> *>(d->self);
 
                 try {
                     c->r->set_value( c->f( *self ));
@@ -96,6 +96,8 @@ namespace uv {
                 } catch( ... ) {
                     c->r->set_exception( std::current_exception());
                 }
+
+                c->p.reset();
             } );
         };
 
@@ -111,9 +113,11 @@ namespace uv {
 
                 Cont *c = static_cast<Cont *>(d->continuation.get());
 
-                auto self = static_cast<Async <P, R> *>(d->self);
+                auto self = static_cast<Async<P, R> *>(d->self);
 
                 c->f( *self, *c->p );
+
+                c->p.reset();
             } );
         };
 
@@ -129,7 +133,7 @@ namespace uv {
 
                 Cont *c = static_cast<Cont *>(d->continuation.get());
 
-                auto self = static_cast<Async <P, R> *>(d->self);
+                auto self = static_cast<Async<P, R> *>(d->self);
 
                 try {
                     c->r->set_value( c->f( *self, *c->p ));
@@ -137,6 +141,8 @@ namespace uv {
                 } catch( ... ) {
                     c->r->set_exception( std::current_exception());
                 }
+
+                c->p.reset();
             } );
         };
 
@@ -147,7 +153,7 @@ namespace uv {
         };
 
         template <typename P, typename R>
-        typename std::enable_if<std::is_void<P>::value && !std::is_void<R>::value, std::future < R>>
+        typename std::enable_if<std::is_void<P>::value && !std::is_void<R>::value, std::future<R>>
 
         ::type
         async_send( uv_async_t *a, HandleData *hd ) {
@@ -157,7 +163,7 @@ namespace uv {
 
             //Don't overwrite existing promise
             if( !c->r ) {
-                c->r = std::make_shared < std::promise < R >> ( );
+                c->r = std::make_shared<std::promise<R >>();
             }
 
             uv_async_send( a );
@@ -178,7 +184,7 @@ namespace uv {
         };
 
         template <typename P, typename R>
-        typename std::enable_if<!std::is_void<P>::value && !std::is_void<R>::value, std::future < R>>
+        typename std::enable_if<!std::is_void<P>::value && !std::is_void<R>::value, std::future<R>>
 
         ::type
         async_send( uv_async_t *a, HandleData *hd, P &&arg ) {
@@ -187,7 +193,7 @@ namespace uv {
             Cont *c = static_cast<Cont *>(hd->continuation.get());
 
             if( !c->r ) {
-                c->r = std::make_shared < std::promise < R >> ( );
+                c->r = std::make_shared<std::promise<R >>();
             }
 
             c->p = std::make_shared<P>( std::move( arg ));
@@ -205,7 +211,7 @@ namespace uv {
         };
 
         template <typename P, typename R>
-        typename std::enable_if<!std::is_void<P>::value && !std::is_void<R>::value, std::future < R>>
+        typename std::enable_if<!std::is_void<P>::value && !std::is_void<R>::value, std::future<R>>
 
         ::type
         async_send( uv_async_t *a, HandleData *hd, const P &arg ) {
@@ -240,7 +246,7 @@ namespace uv {
 
             template <typename Functor2>
             inline void stop( Functor2 f ) {
-                this->internal_data.secondary_continuation = std::make_shared < Continuation < Functor2 >> ( f );
+                this->internal_data.secondary_continuation = std::make_shared<Continuation<Functor2 >>( f );
 
                 this->close( []( uv_handle_t *h ) {
                     HandleData *d = static_cast<HandleData *>(h->data);
