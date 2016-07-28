@@ -95,10 +95,10 @@ namespace uv {
                 } else {
                     status = ASYNC_STATUS_INCOMPLETE;
 
-                    auto old_s = *this->s;
+                    std::shared_future<return_type> old_s = *this->s;
 
-                    this->r = std::make_shared<std::promise<return_type >>();
-                    this->s = std::make_shared<std::shared_future<return_type >>( this->r->get_future());
+                    this->r.reset();
+                    this->s.reset();
 
                     should_send = false;
 
