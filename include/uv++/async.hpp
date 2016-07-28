@@ -11,29 +11,68 @@
 
 namespace uv {
     namespace detail {
+        template <typename K>
+        struct dispatch_helper {
+            template <typename Functor, typename... Args>
+            static inline void dispatch( std::promise<K> &result, Functor f, Args... args ) {
+                try {
+                    result.set_value( f( std::forward<Args>( args )... ));
+
+                } catch( ... ) {
+                    result.set_exception( std::current_exception());
+                }
+            }
+        };
+
+        template <>
+        struct dispatch_helper<void> {
+            template <typename Functor, typename... Args>
+            static inline void dispatch( std::promise<void> &result, Functor f, Args... args ) {
+                try {
+                    f( std::forward<Args>( args )... );
+
+                    result.set_value();
+
+                } catch( ... ) {
+                    result.set_exception( std::current_exception());
+                }
+            }
+        };
+
         template <typename Functor, typename P, typename R>
         struct AsyncContinuation : public Continuation<Functor> {
             typedef P parameter_type;
             typedef R return_type;
 
-            AsyncContinuation( Functor f )
+            inline AsyncContinuation( Functor f )
                 : Continuation<Functor>( f ) {
             }
 
-            std::shared_ptr<std::promise<return_type>> r;
-            std::shared_ptr<parameter_type>            p;
-        };
+            std::shared_ptr<std::promise<return_type>>       r;
+            std::shared_ptr<std::shared_future<return_type>> s;
+            std::shared_ptr<parameter_type>                  p;
 
-        template <typename Functor, typename P>
-        struct AsyncContinuation<Functor, P, void> : public Continuation<Functor> {
-            typedef P    parameter_type;
-            typedef void return_type;
+            template <typename T>
+            inline void dispatch( const T &t ) {
+                dispatch_helper<return_type>::dispatch( *this->r, this->f, t, *p );
 
-            AsyncContinuation( Functor f )
-                : Continuation<Functor>( f ) {
+                this->p.reset();
             }
 
-            std::shared_ptr<parameter_type> p;
+            template <typename... Args>
+            std::shared_future<return_type> init( Args &&... args ) {
+                if( !this->r ) {
+                    this->r = std::make_shared<std::promise<return_type>>();
+                }
+
+                this->p = std::make_shared<parameter_type>( std::forward<Args>( args )... );
+
+                if( !this->s ) {
+                    this->s = std::make_shared<std::shared_future<return_type>>( this->r->get_future());
+                }
+
+                return *this->s;
+            }
         };
 
         template <typename Functor, typename R>
@@ -41,181 +80,29 @@ namespace uv {
             typedef void parameter_type;
             typedef R    return_type;
 
-            AsyncContinuation( Functor f )
+            inline AsyncContinuation( Functor f )
                 : Continuation<Functor>( f ) {
             }
 
-            std::shared_ptr<std::promise<return_type>> r;
-        };
+            std::shared_ptr<std::promise<return_type>>       r;
+            std::shared_ptr<std::shared_future<return_type>> s;
 
-        template <typename Functor>
-        struct AsyncContinuation<Functor, void, void> : public Continuation<Functor> {
-            typedef void parameter_type;
-            typedef void return_type;
-
-            AsyncContinuation( Functor f )
-                : Continuation<Functor>( f ) {
+            template <typename T>
+            inline void dispatch( const T &t ) {
+                dispatch_helper<return_type>::dispatch( *this->r, this->f, t );
             }
-        };
 
-        template <typename P, typename R, typename Functor>
-        typename std::enable_if<std::is_void<P>::value && std::is_void<R>::value>::type
-        start_async( uv_loop_t *loop, uv_async_t *handle, HandleData *hd, Functor f ) {
-            typedef AsyncContinuation<Functor, P, R> Cont;
-
-            hd->continuation = std::make_shared<Cont>( f );
-
-            uv_async_init( loop, handle, []( uv_async_t *h ) {
-                HandleData *d = static_cast<HandleData *>(h->data);
-
-                Cont *c = static_cast<Cont *>(d->continuation.get());
-
-                auto self = static_cast<Async<P, R> *>(d->self);
-
-                c->f( *self );
-            } );
-        };
-
-        template <typename P, typename R, typename Functor>
-        typename std::enable_if<std::is_void<P>::value && !std::is_void<R>::value>::type
-        start_async( uv_loop_t *loop, uv_async_t *handle, HandleData *hd, Functor f ) {
-            typedef AsyncContinuation<Functor, P, R> Cont;
-
-            hd->continuation = std::make_shared<Cont>( f );
-
-            uv_async_init( loop, handle, []( uv_async_t *h ) {
-                HandleData *d = static_cast<HandleData *>(h->data);
-
-                Cont *c = static_cast<Cont *>(d->continuation.get());
-
-                auto self = static_cast<Async<P, R> *>(d->self);
-
-                try {
-                    c->r->set_value( c->f( *self ));
-
-                } catch( ... ) {
-                    c->r->set_exception( std::current_exception());
+            std::shared_future<return_type> init() {
+                if( !this->r ) {
+                    this->r = std::make_shared<std::promise<return_type>>();
                 }
 
-                c->p.reset();
-            } );
-        };
-
-        template <typename P, typename R, typename Functor>
-        typename std::enable_if<!std::is_void<P>::value && std::is_void<R>::value>::type
-        start_async( uv_loop_t *loop, uv_async_t *handle, HandleData *hd, Functor f ) {
-            typedef AsyncContinuation<Functor, P, R> Cont;
-
-            hd->continuation = std::make_shared<Cont>( f );
-
-            uv_async_init( loop, handle, []( uv_async_t *h ) {
-                HandleData *d = static_cast<HandleData *>(h->data);
-
-                Cont *c = static_cast<Cont *>(d->continuation.get());
-
-                auto self = static_cast<Async<P, R> *>(d->self);
-
-                c->f( *self, *c->p );
-
-                c->p.reset();
-            } );
-        };
-
-        template <typename P, typename R, typename Functor>
-        typename std::enable_if<!std::is_void<P>::value && !std::is_void<R>::value>::type
-        start_async( uv_loop_t *loop, uv_async_t *handle, HandleData *hd, Functor f ) {
-            typedef AsyncContinuation<Functor, P, R> Cont;
-
-            hd->continuation = std::make_shared<Cont>( f );
-
-            uv_async_init( loop, handle, []( uv_async_t *h ) {
-                HandleData *d = static_cast<HandleData *>(h->data);
-
-                Cont *c = static_cast<Cont *>(d->continuation.get());
-
-                auto self = static_cast<Async<P, R> *>(d->self);
-
-                try {
-                    c->r->set_value( c->f( *self, *c->p ));
-
-                } catch( ... ) {
-                    c->r->set_exception( std::current_exception());
+                if( !this->s ) {
+                    this->s = std::make_shared<std::shared_future<return_type>>( this->r->get_future());
                 }
 
-                c->p.reset();
-            } );
-        };
-
-        template <typename P, typename R, typename... Args>
-        typename std::enable_if<std::is_void<P>::value && std::is_void<R>::value>::type
-        async_send( uv_async_t *a, HandleData *hd ) {
-            uv_async_send( a );
-        };
-
-        template <typename P, typename R>
-        typename std::enable_if<std::is_void<P>::value && !std::is_void<R>::value, std::future<R>>
-
-        ::type
-        async_send( uv_async_t *a, HandleData *hd ) {
-            typedef AsyncContinuation<void *, P, R> Cont;
-
-            Cont *c = static_cast<Cont *>(hd->continuation.get());
-
-            //Don't overwrite existing promise
-            if( !c->r ) {
-                c->r = std::make_shared<std::promise<R >>();
+                return *this->s;
             }
-
-            uv_async_send( a );
-
-            return c->r->get_future();
-        };
-
-        template <typename P, typename R>
-        typename std::enable_if<!std::is_void<P>::value && std::is_void<R>::value>::type
-        async_send( uv_async_t *a, HandleData *hd, P &&arg ) {
-            typedef AsyncContinuation<void *, P, R> Cont;
-
-            Cont *c = static_cast<Cont *>(hd->continuation.get());
-
-            c->p = std::make_shared<P>( std::move( arg ));
-
-            uv_async_send( a );
-        };
-
-        template <typename P, typename R>
-        typename std::enable_if<!std::is_void<P>::value && !std::is_void<R>::value, std::future<R>>
-
-        ::type
-        async_send( uv_async_t *a, HandleData *hd, P &&arg ) {
-            typedef AsyncContinuation<void *, P, R> Cont;
-
-            Cont *c = static_cast<Cont *>(hd->continuation.get());
-
-            if( !c->r ) {
-                c->r = std::make_shared<std::promise<R >>();
-            }
-
-            c->p = std::make_shared<P>( std::move( arg ));
-
-            uv_async_send( a );
-
-            return c->r->get_future();
-        };
-
-
-        template <typename P, typename R>
-        typename std::enable_if<!std::is_void<P>::value && std::is_void<R>::value>::type
-        async_send( uv_async_t *a, HandleData *hd, const P &arg ) {
-            return async_send( a, hd, std::move( arg ));
-        };
-
-        template <typename P, typename R>
-        typename std::enable_if<!std::is_void<P>::value && !std::is_void<R>::value, std::future<R>>
-
-        ::type
-        async_send( uv_async_t *a, HandleData *hd, const P &arg ) {
-            return async_send( a, hd, std::move( arg ));
         };
     }
 
@@ -232,20 +119,38 @@ namespace uv {
         public:
             template <typename Functor>
             inline void start( Functor f ) {
-                uv::detail::start_async<P, R>( this->_loop, this->handle(), &this->internal_data, f );
+                typedef detail::AsyncContinuation<Functor, P, R> Cont;
+
+                this->internal_data.continuation = std::make_shared<Cont>( f );
+
+                uv_async_init( this->_loop, this->handle(), []( uv_async_t *h ) {
+                    HandleData *d = static_cast<HandleData *>(h->data);
+
+                    Cont *c = static_cast<Cont *>(d->continuation.get());
+
+                    c->dispatch( *static_cast<Async<P, R> *>(d->self));
+                } );
             }
 
             template <typename... Args>
-            auto send( Args &&... args ) {
-                return detail::async_send<P, R>( this->handle(), &this->internal_data, std::forward<Args>( args )... );
+            inline std::shared_future<R> send( Args &&... args ) {
+                typedef detail::AsyncContinuation<void *, P, R> Cont;
+
+                Cont *c = static_cast<Cont *>(this->internal_data.continuation.get());
+
+                auto ret = c->init( std::forward<Args>( args )... );
+
+                uv_async_send( this->handle());
+
+                return ret;
             }
 
-            void stop() {
+            inline void stop() {
                 this->stop( []( auto ) {} );
             }
 
             template <typename Functor2>
-            inline void stop( Functor2 f ) {
+            void stop( Functor2 f ) {
                 this->internal_data.secondary_continuation = std::make_shared<Continuation<Functor2 >>( f );
 
                 this->close( []( uv_handle_t *h ) {
