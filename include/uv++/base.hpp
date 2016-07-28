@@ -13,7 +13,7 @@
 
 namespace uv {
     template <typename Functor>
-    struct Continuation {
+    struct Continuation : public std::enable_shared_from_this<Continuation<Functor>> {
         Functor f;
 
         Continuation( Functor _f ) : f( _f ) {}
