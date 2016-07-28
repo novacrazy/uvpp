@@ -9,6 +9,7 @@
 #include <csignal>
 #include <cstring>
 
+#include <memory>
 #include <string>
 #include <algorithm>
 
@@ -18,6 +19,13 @@
 
 namespace uv {
     namespace detail {
+        template <typename Functor>
+        struct Continuation : public std::enable_shared_from_this<Continuation<Functor>> {
+            Functor f;
+
+            inline Continuation( Functor _f ) : f( _f ) {}
+        };
+
         /*
          * So this is here because MinGW doesn't have a working strsignal implementation for some reason, so on MinGW
          * I have to manually list every single possible signal because I don't know what is and isn't on every system.
