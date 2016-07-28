@@ -10,13 +10,22 @@
 
 #include "detail/handle_detail.hpp"
 
+#include "type_traits.hpp"
+
 #include <memory>
 
 namespace uv {
     struct HandleData {
+        //For user data, obviously
         std::shared_ptr<void> user_data;
+
+        //For primary continuation of callbacks
         std::shared_ptr<void> continuation;
-        void                  *self;
+
+        //Only used for close callbacks
+        std::shared_ptr<void> secondary_continuation;
+
+        void *self;
 
         HandleData( void *s ) : self( s ) {
             assert( s != nullptr );
@@ -40,16 +49,30 @@ namespace uv {
         protected:
             HandleData internal_data;
 
-            virtual void _init() {
-                //No-op
-            }
+            uv_loop_t *_loop;
+            Loop      *_parent_loop;
 
-            void _initData() {
+            //Implemented in derived classes
+            virtual void _init() = 0;
+
+            //Can be called in subclasses
+            inline void init( Loop *p, uv_loop_t *l ) {
+                assert( p != nullptr );
+                assert( l != nullptr );
+
+                this->_parent_loop = p;
+                this->_loop        = l;
+
                 this->handle()->data = &this->internal_data;
+
+                this->_init();
             }
 
         public:
             HandleBase() : internal_data( this ) {}
+
+            //Implemented in Loop.hpp to pass Loop::handle() to this->init(uv_loop_t*)
+            inline void init( Loop * );
 
             virtual const handle_t *handle() const = 0;
 
@@ -60,6 +83,10 @@ namespace uv {
             virtual void start() {
                 throw new Exception( UV_ENOSYS );
             };
+
+            inline Loop *loop() {
+                return this->_parent_loop;
+            }
 
             inline std::shared_ptr<void> &data() {
                 HandleData *p = static_cast<HandleData *>(this->handle()->data);
@@ -89,8 +116,6 @@ namespace uv {
             typedef typename HandleBase<H>::handle_t handle_t;
 
         protected:
-            uv_loop_t *loop;
-
             handle_t _handle;
 
         public:
@@ -101,8 +126,6 @@ namespace uv {
             inline handle_t *handle() {
                 return &_handle;
             }
-
-            inline void init( Loop *l );
 
             inline bool is_active() const {
                 return uv_is_active((uv_handle_t *)( this->handle())) != 0;
@@ -118,17 +141,17 @@ namespace uv {
 
             template <typename Functor>
             void close( Functor f ) {
-                //TODO
+                uv_close((uv_handle_t *)( this->handle()), f );
             }
     };
 
-    class Idle : public Handle<uv_idle_t> {
+    class Idle final : public Handle<uv_idle_t> {
         public:
             typedef typename Handle<uv_idle_t>::handle_t handle_t;
 
         protected:
             inline void _init() {
-                uv_idle_init( this->loop, &_handle );
+                uv_idle_init( this->_loop, &_handle );
             }
 
         public:
@@ -150,13 +173,13 @@ namespace uv {
             }
     };
 
-    class Prepare : public Handle<uv_prepare_t> {
+    class Prepare final : public Handle<uv_prepare_t> {
         public:
             typedef typename Handle<uv_prepare_t>::handle_t handle_t;
 
         protected:
             inline void _init() {
-                uv_prepare_init( this->loop, &_handle );
+                uv_prepare_init( this->_loop, &_handle );
             }
 
         public:
@@ -178,13 +201,13 @@ namespace uv {
             }
     };
 
-    class Check : public Handle<uv_check_t> {
+    class Check final : public Handle<uv_check_t> {
         public:
             typedef typename Handle<uv_check_t>::handle_t handle_t;
 
         protected:
             inline void _init() {
-                uv_check_init( this->loop, &_handle );
+                uv_check_init( this->_loop, &_handle );
             }
 
         public:
@@ -206,20 +229,25 @@ namespace uv {
             }
     };
 
-    class Timer : public Handle<uv_timer_t> {
+    class Timer final : public Handle<uv_timer_t> {
         public:
             typedef typename Handle<uv_timer_t>::handle_t handle_t;
 
         protected:
             inline void _init() {
-                uv_timer_init( this->loop, &_handle );
+                uv_timer_init( this->_loop, &_handle );
             }
 
         public:
-            template <typename Functor, typename _Rep, typename _Period, typename _Rep2, typename _Period2>
+            template <typename Functor,
+                      typename _Rep, typename _Period,
+                      typename _Rep2 = uint64_t, typename _Period2 = std::milli>
             inline void start( Functor f,
                                const std::chrono::duration<_Rep, _Period> &timeout,
-                               const std::chrono::duration<_Rep2, _Period2> &repeat = std::chrono::duration_values<_Rep>::zero()) {
+                               const std::chrono::duration<_Rep2, _Period2> &repeat =
+                               std::chrono::duration<_Rep2, _Period2>(
+                                   std::chrono::duration_values<_Rep2>::zero())) {
+
                 typedef std::chrono::duration<uint64_t, std::milli> millis;
 
                 this->internal_data.continuation = std::make_shared<Continuation<Functor>>( f );
@@ -231,7 +259,7 @@ namespace uv {
 
                                     static_cast<Continuation<Functor> *>(d->continuation.get())->f( *self );
                                 },
-                                //libuv expects milliseconds, so convert any duration given to milliseconds
+                    //libuv expects milliseconds, so convert any duration given to milliseconds
                                 std::chrono::duration_cast<millis>( timeout ).count(),
                                 std::chrono::duration_cast<millis>( repeat ).count()
                 );
@@ -242,45 +270,13 @@ namespace uv {
             }
     };
 
-    class Async : public Handle<uv_async_t> {
-        public:
-            typedef typename Handle<uv_async_t>::handle_t handle_t;
-
-        public:
-            template <typename Functor>
-            inline void start( Functor f ) {
-                this->internal_data.continuation = std::make_shared<Continuation<Functor>>( f );
-
-                uv_async_init( this->loop, &_handle, []( uv_async_t *h ) {
-                    HandleData *d = static_cast<HandleData *>(h->data);
-
-                    Check *self = static_cast<Check *>(d->self);
-
-                    static_cast<Continuation<Functor> *>(d->continuation.get())->f( *self );
-                } );
-            }
-
-            inline void send() {
-                uv_async_send( &_handle );
-            }
-
-            void stop() {
-                this->stop( []( auto ) {} );
-            }
-
-            template <typename Functor>
-            inline void stop( Functor f ) {
-                this->close( f );
-            }
-    };
-
-    class Signal : public Handle<uv_signal_t> {
+    class Signal final : public Handle<uv_signal_t> {
         public:
             typedef typename Handle<uv_signal_t>::handle_t handle_t;
 
         protected:
             void _init() {
-                uv_signal_init( this->loop, &_handle );
+                uv_signal_init( this->_loop, &_handle );
             }
 
         public:

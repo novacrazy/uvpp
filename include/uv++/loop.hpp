@@ -10,6 +10,7 @@
 #include "fwd.hpp"
 
 #include "handle.hpp"
+#include "async.hpp"
 #include "fs.hpp"
 
 #include <future>
@@ -27,7 +28,7 @@
 #endif
 
 namespace uv {
-    class Loop : public HandleBase<uv_loop_t> {
+    class Loop final : public HandleBase<uv_loop_t> {
         public:
             typedef typename HandleBase<uv_loop_t>::handle_t handle_t;
 
@@ -38,7 +39,7 @@ namespace uv {
             friend class Filesystem;
 
         private:
-            handle_t loop;
+            bool external;
 
             Filesystem _fs;
 
@@ -48,10 +49,10 @@ namespace uv {
             handle_set_type                                   handle_set;
 
         protected:
-            inline void _init( uv_loop_t *l ) {
-                assert( l != nullptr );
-
-                uv_loop_init( l );
+            inline void _init() {
+                if( !this->external ) {
+                    uv_loop_init( this->handle());
+                }
             }
 
         public:
@@ -64,16 +65,21 @@ namespace uv {
             };
 
             inline const handle_t *handle() const {
-                return &loop;
+                return _loop;
             }
 
             inline handle_t *handle() {
-                return &loop;
+                return _loop;
             }
 
-            inline Loop() : _fs( this ) {
-                this->_initData();
-                this->_init( this->handle());
+            inline Loop()
+                : _fs( this ), external( false ) {
+                this->init( this, new handle_t );
+            }
+
+            explicit inline Loop( handle_t *l )
+                : _fs( this ), external( true ) {
+                this->init( this, l );
             }
 
             inline Filesystem *fs() {
@@ -83,7 +89,7 @@ namespace uv {
             inline int run( uv_run_mode mode = UV_RUN_DEFAULT ) {
                 stopped = false;
 
-                return uv_run( &loop, mode );
+                return uv_run( handle(), mode );
             }
 
             template <typename _Rep, typename _Period>
@@ -110,13 +116,13 @@ namespace uv {
             inline void stop() {
                 stopped = true;
 
-                uv_stop( &loop );
+                uv_stop( handle());
             }
 
             template <typename... Args>
             typename std::enable_if<all_type<uv_loop_option, Args...>::value, Loop &>::type
             inline configure( Args &&... args ) {
-                auto res = uv_loop_configure( &loop, std::forward<Args>( args )... );
+                auto res = uv_loop_configure( handle(), std::forward<Args>( args )... );
 
                 if( res != 0 ) {
                     throw Exception( res );
@@ -130,24 +136,24 @@ namespace uv {
             }
 
             inline int backend_fs() const {
-                return uv_backend_fd( &loop );
+                return uv_backend_fd( handle());
             }
 
             inline int backend_timeout() const {
-                return uv_backend_timeout( &loop );
+                return uv_backend_timeout( handle());
             }
 
             inline uint64_t now() const {
-                return uv_now( &loop );
+                return uv_now( handle());
             }
 
             inline void update_time() {
-                uv_update_time( &loop );
+                uv_update_time( handle());
             }
 
             //returns true on closed
             inline bool try_close( int *resptr = nullptr ) {
-                int res = uv_loop_close( &loop );
+                int res = uv_loop_close( handle());
 
                 if( resptr != nullptr ) {
                     *resptr = res;
@@ -168,12 +174,16 @@ namespace uv {
             }
 
             ~Loop() throw( Exception ) {
+                if( !this->external ) {
+                    delete handle();
+                }
+
                 for( std::shared_ptr<void> x : handle_set ) {
                     static_cast<Handle<uv_handle_t> *>(x.get())->stop();
                 }
 
                 this->stop();
-                this->close();
+                //this->close(); //TODO
             }
 
         protected:
@@ -264,10 +274,10 @@ namespace uv {
                 return new_handle<Timer>( f, timeout, repeat );
             }
 
-            template <typename... Args>
-            inline std::shared_ptr<Async> async( Args &&... args ) {
-                return new_handle<Async>( std::forward<Args>( args )... );
-            }
+            template <typename P = void, typename R = void, typename... Args>
+            inline std::shared_ptr<Async<P, R>> async( Args &&... args ) {
+                return new_handle<Async<P, R>>( std::forward<Args>( args )... );
+            };
 
             template <typename... Args>
             inline std::shared_ptr<Signal> signal( Args &&... args ) {
@@ -303,9 +313,8 @@ namespace uv {
                 const char        *type;
                 UV_QUEUE          *q;
                 uv_handle_t const *h;
-                const uv_loop_t   *loop = this->handle();
 
-                UV_QUEUE_FOREACH( q, &loop->handle_queue ) {
+                UV_QUEUE_FOREACH( q, &handle()->handle_queue ) {
                     h = UV_QUEUE_DATA( q, uv_handle_t, handle_queue );
 
                     if( !only_active || ( h->flags & UV__HANDLE_ACTIVE != 0 )) {
@@ -341,19 +350,31 @@ namespace uv {
             }
     };
 
+    namespace detail {
+        static std::shared_ptr<::uv::Loop> default_loop_ptr;
+    }
+
+    std::shared_ptr<Loop> default_loop() {
+        using namespace ::uv::detail;
+
+        if( !default_loop_ptr ) {
+            default_loop_ptr = std::make_shared<Loop>( uv_default_loop());
+        }
+
+        return default_loop_ptr;
+    }
+
     template <typename H>
-    inline void Handle<H>::init( Loop *l ) {
+    inline void HandleBase<H>::init( Loop *l ) {
         assert( l != nullptr );
 
-        this->_initData();
-        this->loop = l->handle();
-        this->_init();
+        this->init( l, l->handle());
     }
 
     void Filesystem::init( Loop *l ) {
         assert( l != nullptr );
 
-        this->loop = l->handle();
+        this->_loop = l->handle();
     }
 }
 
