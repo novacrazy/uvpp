@@ -5,9 +5,11 @@
 #ifndef UV_LOOP_HPP
 #define UV_LOOP_HPP
 
-#include "base.hpp"
-#include "type_traits.hpp"
 #include "fwd.hpp"
+
+#include "defines.hpp"
+#include "exception.hpp"
+#include "type_traits.hpp"
 
 #include "handle.hpp"
 #include "async.hpp"
@@ -32,7 +34,7 @@ namespace uv {
         public:
             typedef typename HandleBase<uv_loop_t>::handle_t handle_t;
 
-            template <typename H>
+            template <typename H, typename D>
             friend
             class Handle;
 
@@ -45,14 +47,23 @@ namespace uv {
 
             std::atomic_bool stopped;
 
-            typedef std::unordered_set<std::shared_ptr<void>> handle_set_type;
-            handle_set_type                                   handle_set;
+            typedef std::unordered_set<std::shared_ptr<void>>             handle_set_type;
+            handle_set_type                                               handle_set;
+
+            typedef std::pair<uv_handle_t *, void ( * )( uv_handle_t * )> close_args;
+
+            std::shared_ptr<Async<close_args>> close_async;
 
         protected:
             inline void _init() {
                 if( !this->external ) {
                     uv_loop_init( this->handle());
                 }
+
+                //The reference on auto& is essential
+                this->close_async = this->async<close_args>( [this]( auto &, close_args h ) {
+                    uv_close( h.first, h.second );
+                } );
             }
 
         public:
@@ -179,7 +190,7 @@ namespace uv {
                 }
 
                 for( std::shared_ptr<void> x : handle_set ) {
-                    static_cast<Handle<uv_handle_t> *>(x.get())->stop();
+                    static_cast<HandleBase<uv_handle_t> *>(x.get())->stop();
                 }
 
                 this->stop();
@@ -369,6 +380,22 @@ namespace uv {
         assert( l != nullptr );
 
         this->init( l, l->handle());
+    }
+
+    template <typename H, typename D>
+    template <typename Functor>
+    inline std::shared_future<void> Handle<H, D>::close( Functor f ) {
+        typedef detail::Continuation<Functor> Cont;
+
+        this->internal_data.secondary_continuation = std::make_shared<Cont>( f );
+
+        return this->loop()->close_async->send( std::make_pair((uv_handle_t *)( this->handle()), []( uv_handle_t *h ) {
+            HandleData *d = static_cast<HandleData *>(h->data);
+
+            typename Handle<H, D>::derived_type *self = static_cast<typename Handle<H, D>::derived_type *>(d->self);
+
+            static_cast<Cont *>(d->secondary_continuation.get())->f( *self );
+        } ));
     }
 
     void Filesystem::init( Loop *l ) {
