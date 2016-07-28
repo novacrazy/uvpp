@@ -16,7 +16,7 @@ namespace uv {
     struct Continuation : public std::enable_shared_from_this<Continuation<Functor>> {
         Functor f;
 
-        Continuation( Functor _f ) : f( _f ) {}
+        inline Continuation( Functor _f ) : f( _f ) {}
     };
 }
 
