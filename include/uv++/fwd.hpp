@@ -24,6 +24,7 @@ namespace uv {
 
     class Timer;
 
+    template <typename, typename>
     class Async;
 
     class Signal;
