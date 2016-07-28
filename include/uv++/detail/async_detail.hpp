@@ -23,7 +23,7 @@ namespace uv {
         struct dispatch_helper {
             template <typename Functor, typename T, typename... Args>
             static inline void
-            dispatch( std::promise<K> &result, Functor f, std::atomic_int &status, T *t, Args &... args ) {
+            dispatch( std::promise<K> &result, Functor f, std::atomic_int &status, T *t, Args... args ) {
                 try {
                     auto &&r = f( *t, std::forward<Args>( args )... );
 
@@ -43,7 +43,7 @@ namespace uv {
         struct dispatch_helper<void> {
             template <typename Functor, typename T, typename... Args>
             static inline void
-            dispatch( std::promise<void> &result, Functor f, std::atomic_int &status, T *t, Args &... args ) {
+            dispatch( std::promise<void> &result, Functor f, std::atomic_int &status, T *t, Args... args ) {
                 try {
                     f( *t, std::forward<Args>( args )... );
 
