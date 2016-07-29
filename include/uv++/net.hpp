@@ -5,20 +5,13 @@
 #ifndef UV_NET_HPP
 #define UV_NET_HPP
 
-#include "defines.hpp"
-#include "exception.hpp"
 #include "fwd.hpp"
+
+#include "exception.hpp"
 
 #include <vector>
 #include <array>
 #include <algorithm>
-
-#ifdef UV_OVERLOAD_OSTREAM
-
-#include <ostream>
-#include <iomanip>
-
-#endif
 
 namespace uv {
     namespace net {
@@ -200,6 +193,8 @@ namespace uv {
 }
 
 #ifdef UV_OVERLOAD_OSTREAM
+
+#include <iomanip>
 
 template <typename _Char>
 std::basic_ostream<_Char> &

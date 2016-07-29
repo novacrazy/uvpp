@@ -5,9 +5,9 @@
 #ifndef UV_OS_HPP
 #define UV_OS_HPP
 
-#include "defines.hpp"
-#include "exception.hpp"
 #include "fwd.hpp"
+
+#include "exception.hpp"
 
 #include <vector>
 #include <array>

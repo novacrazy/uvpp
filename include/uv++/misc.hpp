@@ -5,9 +5,9 @@
 #ifndef UV_MISC_HPP
 #define UV_MISC_HPP
 
-#include "defines.hpp"
-#include "exception.hpp"
 #include "fwd.hpp"
+
+#include "exception.hpp"
 
 namespace uv {
     //I would still recommend the stuff in <chrono> though
