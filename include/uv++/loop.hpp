@@ -46,6 +46,12 @@ namespace uv {
 
             friend class Filesystem;
 
+            enum run_mode : std::underlying_type<uv_run_mode>::type {
+                RUN_DEFAULT = UV_RUN_DEFAULT,
+                RUN_ONCE    = UV_RUN_ONCE,
+                RUN_NOWAIT  = UV_RUN_NOWAIT
+            };
+
         private:
             bool external;
 
@@ -88,6 +94,7 @@ namespace uv {
 
                     this->close_queue.clear();
 #endif
+                    this->update_time();
                 } );
             }
 
@@ -130,33 +137,56 @@ namespace uv {
                 return &_fs;
             }
 
-            inline int run( uv_run_mode mode = UV_RUN_DEFAULT ) {
-                stopped = false;
+            inline int run( run_mode mode = RUN_DEFAULT ) {
+                this->stopped = false;
 
                 this->loop_thread = std::this_thread::get_id();
 
-                return uv_run( handle(), mode );
+                return uv_run( handle(), (uv_run_mode)( mode ));
             }
 
             template <typename _Rep, typename _Period>
-            inline void run_forever( const std::chrono::duration<_Rep, _Period> &delay ) {
-                stopped = false;
+            inline void
+            run_forever( const std::chrono::duration<_Rep, _Period> &delay, run_mode mode = RUN_DEFAULT ) {
+                this->stopped = false;
 
-                while( !stopped ) {
-                    if( !this->run()) {
-                        std::this_thread::sleep_for( delay );
+                typedef std::chrono::nanoseconds                       nano;
+                typedef std::chrono::high_resolution_clock::time_point time_point;
+
+                nano delay_ns = std::chrono::duration_cast<nano>( delay );
+                nano detract  = std::chrono::duration_values<nano>::zero();
+                nano diff;
+
+                time_point pre, post;
+
+                while( !this->stopped ) {
+                    if(( !this->run( mode ) || mode == RUN_NOWAIT ) && detract < delay_ns ) {
+                        pre = std::chrono::high_resolution_clock::now();
+
+                        std::this_thread::sleep_for( delay_ns - detract );
+
+                        post = std::chrono::high_resolution_clock::now();
+
+                        diff = post - pre;
+
+                        if( diff > delay_ns ) {
+                            detract = diff - delay_ns;
+
+                        } else {
+                            detract = std::chrono::duration_values<nano>::zero();
+                        }
                     }
                 }
             }
 
-            inline void run_forever() {
+            inline void run_forever( run_mode mode = RUN_DEFAULT ) {
                 using namespace std::chrono_literals;
 
-                this->run_forever( UV_DEFAULT_LOOP_SLEEP );
+                this->run_forever( UV_DEFAULT_LOOP_SLEEP, mode );
             }
 
-            inline void start() {
-                this->run_forever();
+            inline void start( run_mode mode = RUN_DEFAULT ) {
+                this->run_forever( mode );
             }
 
             inline void stop() {
