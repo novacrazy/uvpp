@@ -9,7 +9,7 @@ The github name is uvpp because github didn't like uv++ as the repository name. 
 
 ####Known issues:
 
-* Internal async task for closing threads coalesces close requests
+* Just that it's incomplete
 
 ------
 
