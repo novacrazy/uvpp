@@ -7,7 +7,7 @@
 
 #include "handle.hpp"
 
-#include "detail/async_detail.hpp"
+#include "detail/async.hpp"
 
 namespace uv {
     template <typename P = void, typename R = void>

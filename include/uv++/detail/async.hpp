@@ -5,7 +5,7 @@
 #ifndef UV_ASYNC_DETAIL_HPP
 #define UV_ASYNC_DETAIL_HPP
 
-#include "handle_detail.hpp"
+#include "handle.hpp"
 
 #include <memory>
 #include <future>
