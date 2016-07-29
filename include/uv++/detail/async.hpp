@@ -69,32 +69,12 @@ namespace uv {
             std::atomic_int                                  status;
 
             inline AsyncContinuationBase( Functor f )
-                : Continuation<Functor>( f ) {
+                : Continuation<Functor>( f ), status( ASYNC_STATUS_INCOMPLETE ) {
             }
 
-            std::shared_future<return_type> base_init( std::atomic_bool &should_send ) {
-                if( this->status == ASYNC_STATUS_INCOMPLETE ) {
-                    if( !this->r ) {
-                        this->r = std::make_shared<std::promise<return_type >>();
-                    }
-
-                    if( !this->s ) {
-                        this->s = std::make_shared<std::shared_future<return_type >>( this->r->get_future());
-                    }
-
-                    return *this->s;
-
-                } else if( this->status == ASYNC_STATUS_COMPLETED ) {
-                    status = ASYNC_STATUS_INCOMPLETE;
-
-                    this->r = std::make_shared<std::promise<return_type >>();
-                    this->s = std::make_shared<std::shared_future<return_type >>( this->r->get_future());
-
-                    return *this->s;
-
-                } else {
-                    status = ASYNC_STATUS_INCOMPLETE;
-
+            inline std::shared_future<return_type> base_init( std::atomic_bool &should_send ) {
+                //Atomically test if the last dispatch threw and replace it with ASYNC_STATUS_INCOMPLETE for the next dispatch
+                if( this->status.exchange( ASYNC_STATUS_INCOMPLETE ) == ASYNC_STATUS_THREW ) {
                     std::shared_future<return_type> old_s = *this->s;
 
                     this->r.reset();
@@ -103,6 +83,12 @@ namespace uv {
                     should_send = false;
 
                     return old_s;
+
+                } else {
+                    this->r = std::make_shared<std::promise<return_type >>();
+                    this->s = std::make_shared<std::shared_future<return_type >>( this->r->get_future());
+
+                    return *this->s;
                 }
             }
         };
