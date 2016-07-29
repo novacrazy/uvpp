@@ -146,10 +146,10 @@ namespace uv {
             }
 
             template <typename _Rep, typename _Period>
-            inline void
-            run_forever( const std::chrono::duration<_Rep, _Period> &delay, run_mode mode = RUN_DEFAULT ) {
+            inline void run_forever( const std::chrono::duration<_Rep, _Period> &delay, run_mode mode = RUN_DEFAULT ) {
                 this->stopped = false;
 
+#ifdef UV_DETRACT_LOOP
                 typedef std::chrono::nanoseconds                       nano;
                 typedef std::chrono::high_resolution_clock::time_point time_point;
 
@@ -177,6 +177,13 @@ namespace uv {
                         }
                     }
                 }
+#else
+                while( !this->stopped ) {
+                    if( !this->run( mode ) || mode == RUN_NOWAIT ) {
+                        std::this_thread::sleep_for( delay );
+                    }
+                }
+#endif
             }
 
             inline void run_forever( run_mode mode = RUN_DEFAULT ) {
