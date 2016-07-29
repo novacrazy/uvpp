@@ -10,6 +10,7 @@
 #include "exception.hpp"
 #include "type_traits.hpp"
 
+#include "utils.hpp"
 #include "handle.hpp"
 #include "async.hpp"
 #include "fs.hpp"
@@ -20,6 +21,17 @@
 
 #ifndef UV_DEFAULT_LOOP_SLEEP
 #define UV_DEFAULT_LOOP_SLEEP 1ms
+#endif
+
+#ifdef UV_USE_BOOST_LOCKFREE
+
+#include <boost/lockfree/queue.hpp>
+
+#else
+
+#include <mutex>
+#include <deque>
+
 #endif
 
 namespace uv {
@@ -40,12 +52,20 @@ namespace uv {
 
             std::atomic_bool stopped;
 
-            typedef std::unordered_set<std::shared_ptr<void>>             handle_set_type;
-            handle_set_type                                               handle_set;
+            typedef std::unordered_set<std::shared_ptr<void>>                       handle_set_type;
+            handle_set_type                                                         handle_set;
 
-            typedef std::pair<uv_handle_t *, void ( * )( uv_handle_t * )> close_args;
+            typedef detail::TrivialPair<uv_handle_t *, void ( * )( uv_handle_t * )> close_args;
 
-            std::shared_ptr<Async<close_args>> close_async;
+#ifdef UV_USE_BOOST_LOCKFREE
+            boost::lockfree::queue<close_args> close_queue;
+#else
+            std::deque<close_args>   close_queue;
+            std::mutex               close_mutex;
+#endif
+
+            std::shared_ptr<Async<>> close_async;
+            std::thread::id          loop_thread;
 
         protected:
             inline void _init() {
@@ -53,9 +73,20 @@ namespace uv {
                     uv_loop_init( this->handle());
                 }
 
-                //The reference on auto& is essential
-                this->close_async = this->async<close_args>( [this]( auto &, close_args h ) {
-                    uv_close( h.first, h.second );
+                this->close_async = this->async( [this]( auto &a ) {
+#ifdef UV_USE_BOOST_LOCKFREE
+                    this->close_queue.consume_all( []( close_args &c ) {
+                        uv_close( c.first, c.second );
+                    } );
+#else
+                    std::lock_guard<std::mutex> lock( this->close_mutex );
+
+                    for( close_args &c : this->close_queue ) {
+                        uv_close( c.first, c.second );
+                    }
+
+                    this->close_queue.clear();
+#endif
                 } );
             }
 
@@ -77,12 +108,20 @@ namespace uv {
             }
 
             inline Loop()
-                : _fs( this ), external( false ) {
+                : _fs( this ), external( false )
+#ifdef UV_USE_BOOST_LOCKFREE
+                , close_queue( 128 )
+#endif
+            {
                 this->init( this, new handle_t );
             }
 
             explicit inline Loop( handle_t *l )
-                : _fs( this ), external( true ) {
+                : _fs( this ), external( true )
+#ifdef UV_USE_BOOST_LOCKFREE
+                , close_queue( 128 )
+#endif
+            {
                 this->init( this, l );
             }
 
@@ -92,6 +131,8 @@ namespace uv {
 
             inline int run( uv_run_mode mode = UV_RUN_DEFAULT ) {
                 stopped = false;
+
+                this->loop_thread = std::this_thread::get_id();
 
                 return uv_run( handle(), mode );
             }
@@ -374,20 +415,62 @@ namespace uv {
         this->init( l, l->handle());
     }
 
+    namespace detail {
+        template <typename Functor>
+        struct CloseHelperContinuation : public Continuation<Functor> {
+            inline CloseHelperContinuation( Functor f )
+                : Continuation<Functor>( f ) {
+            }
+
+            std::promise<void> p;
+        };
+    }
+
     template <typename H, typename D>
     template <typename Functor>
-    inline std::shared_future<void> Handle<H, D>::close( Functor f ) {
-        typedef detail::Continuation<Functor> Cont;
+    inline std::pair<std::future<void>, std::shared_future<void>> Handle<H, D>::close( Functor f ) {
+        typedef detail::CloseHelperContinuation<Functor> Cont;
 
-        this->internal_data.secondary_continuation = std::make_shared<Cont>( f );
+        auto c = std::make_shared<Cont>( f );
 
-        return this->loop()->close_async->send( std::make_pair((uv_handle_t *)( this->handle()), []( uv_handle_t *h ) {
+        this->internal_data.secondary_continuation = c;
+
+        auto queue_data = Loop::close_args{ (uv_handle_t *)( this->handle()), []( uv_handle_t *h ) {
             HandleData *d = static_cast<HandleData *>(h->data);
 
             typename Handle<H, D>::derived_type *self = static_cast<typename Handle<H, D>::derived_type *>(d->self);
 
-            static_cast<Cont *>(d->secondary_continuation.get())->f( *self );
-        } ));
+            Cont *c2 = static_cast<Cont *>(d->secondary_continuation.get());
+
+            try {
+                c2->f( *self );
+
+                c2->p.set_value();
+
+            } catch( ... ) {
+                c2->p.set_exception( std::current_exception());
+            }
+
+            d->secondary_continuation.reset();
+        }};
+
+#ifdef UV_USE_BOOST_LOCKFREE
+        this->loop()->close_queue.push( queue_data );
+#else
+        auto current_thread = std::this_thread::get_id();
+        auto loop_thread    = this->loop()->loop_thread;
+
+        if( current_thread != loop_thread ) {
+            std::lock_guard<std::mutex> lock( this->loop()->close_mutex );
+
+            this->loop()->close_queue.push_back( queue_data );
+
+        } else {
+            this->loop()->close_queue.push_back( queue_data );
+        }
+#endif
+
+        return std::make_pair( c->p.get_future(), this->loop()->close_async->send());
     }
 
     void Filesystem::init( Loop *l ) {
