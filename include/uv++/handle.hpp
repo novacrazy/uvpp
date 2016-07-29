@@ -7,18 +7,17 @@
 
 #include "fwd.hpp"
 
+#include "detail/data.hpp"
+
 #include "exception.hpp"
 #include "type_traits.hpp"
 
-#include "detail/handle_detail.hpp"
+#include "detail/handle.hpp"
 
 #include <future>
 
 namespace uv {
-    struct HandleData {
-        //For user data, obviously
-        std::shared_ptr<void> user_data;
-
+    struct HandleData : detail::UserData {
         //For primary continuation of callbacks
         std::shared_ptr<void> continuation;
 
@@ -33,9 +32,10 @@ namespace uv {
     };
 
     template <typename H>
-    class HandleBase : public std::enable_shared_from_this<HandleBase<H>> {
+    class HandleBase : public std::enable_shared_from_this<HandleBase<H>>,
+                       public detail::UserDataAccess<HandleData, H> {
         public:
-            typedef H handle_t;
+            typedef typename detail::UserDataAccess<HandleData, H>::handle_t handle_t;
 
         protected:
             HandleData internal_data;
@@ -65,10 +65,6 @@ namespace uv {
             //Implemented in Loop.hpp to pass Loop::handle() to this->init(uv_loop_t*)
             inline void init( Loop * );
 
-            virtual const handle_t *handle() const = 0;
-
-            virtual handle_t *handle() = 0;
-
             virtual void stop() = 0;
 
             virtual void start() {
@@ -77,23 +73,6 @@ namespace uv {
 
             inline Loop *loop() {
                 return this->_parent_loop;
-            }
-
-            inline std::shared_ptr<void> &data() {
-                HandleData *p = static_cast<HandleData *>(this->handle()->data);
-
-                assert( p != nullptr );
-
-                return p->user_data;
-            }
-
-            template <typename R = void>
-            inline const std::shared_ptr<R> data() const {
-                const HandleData *p = static_cast<HandleData *>(this->handle()->data);
-
-                assert( p != nullptr );
-
-                return std::static_pointer_cast<R>( p->user_data );
             }
     };
 
