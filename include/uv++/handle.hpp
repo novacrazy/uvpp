@@ -37,15 +37,6 @@ namespace uv {
         public:
             typedef H handle_t;
 
-            enum class handle_type : std::underlying_type<uv_handle_type>::type {
-                    UNKNOWN_HANDLE = 0,
-#define XX( uc, lc ) uc,
-                    UV_HANDLE_TYPE_MAP( XX )
-#undef XX
-                    FILE,
-                    HANDLE_TYPE_MAX
-            };
-
         protected:
             HandleData internal_data;
 
@@ -104,10 +95,6 @@ namespace uv {
 
                 return std::static_pointer_cast<R>( p->user_data );
             }
-
-            handle_type guess_type() const {
-                return (handle_type)uv_guess_handle( this->handle()->type );
-            }
     };
 
     template <typename H, typename D>
@@ -115,6 +102,16 @@ namespace uv {
         public:
             typedef typename HandleBase<H>::handle_t handle_t;
             typedef D                                derived_type;
+
+            enum class handle_type : std::underlying_type<uv_handle_type>::type {
+                    UNKNOWN_HANDLE = 0,
+#define XX( uc, lc ) uc = UV_##uc,
+                    UV_HANDLE_TYPE_MAP( XX )
+#undef XX
+                    FILE,
+                    HANDLE_TYPE_MAX
+            };
+
 
         protected:
             handle_t _handle;
@@ -142,7 +139,35 @@ namespace uv {
 
             template <typename Functor>
             std::shared_future<void> close( Functor );
+
+            handle_type guess_handle() const {
+                return (handle_type)uv_guess_handle( this->handle()->type );
+            }
+
+            std::string name() const {
+                switch((handle_type)this->handle()->type ) {
+#define XX( uc, lc ) case handle_type::uc: return #uc;
+                    UV_HANDLE_TYPE_MAP( XX )
+                    XX( FILE, file )
+                    XX( HANDLE_TYPE_MAX, handle_type_max )
+                    default:
+                        return "UNKNOWN_HANDLE";
+                }
+            }
+
+            std::string guess_handle_name() const {
+                switch( this->guess_handle()) {
+                    UV_HANDLE_TYPE_MAP( XX )
+                    XX( FILE, file )
+                    XX( HANDLE_TYPE_MAX, handle_type_max )
+#undef XX
+                    default:
+                        return "UNKNOWN_HANDLE";
+                }
+            }
     };
+
+    typedef Handle<uv_handle_t, void> VoidHandle;
 
     class Idle final : public Handle<uv_idle_t, Idle> {
         public:
