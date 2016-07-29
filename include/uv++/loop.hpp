@@ -401,7 +401,7 @@ namespace uv {
 
 template <typename _Char>
 std::basic_ostream<_Char> &operator<<( std::basic_ostream<_Char> &out, const uv::Loop &loop ) {
-    loop.print_handles<_Char>( false, out );
+    loop.print_handles<_Char>( out, false );
 
     return out;
 }
