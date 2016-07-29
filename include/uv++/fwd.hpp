@@ -7,7 +7,11 @@
 
 #include "defines.hpp"
 
+#include <iosfwd>
+
 namespace uv {
+    class Exception;
+
     template <typename>
     class HandleBase;
 

@@ -7,7 +7,6 @@
 
 #include "fwd.hpp"
 
-#include "defines.hpp"
 #include "exception.hpp"
 #include "type_traits.hpp"
 
@@ -15,14 +14,8 @@
 #include "async.hpp"
 #include "fs.hpp"
 
-#include <future>
-#include <mutex>
 #include <thread>
-#include <atomic>
 #include <unordered_set>
-#include <ostream>
-#include <cstdio>
-#include <iostream>
 #include <iomanip>
 
 #ifndef UV_DEFAULT_LOOP_SLEEP
@@ -184,17 +177,16 @@ namespace uv {
                 return true;
             }
 
-            ~Loop() throw( Exception ) {
-                if( !this->external ) {
-                    delete handle();
-                }
-
+            ~Loop() {
                 for( std::shared_ptr<void> x : handle_set ) {
                     static_cast<HandleBase<uv_handle_t> *>(x.get())->stop();
                 }
 
-                this->stop();
-                //this->close(); //TODO
+                if( !this->external ) {
+                    this->stop();
+
+                    delete handle();
+                }
             }
 
         protected:
@@ -301,7 +293,7 @@ namespace uv {
              * Most of it is partially copied from src/uv-common.(h|c) and src/queue.h
              * */
             template <typename _Char = char>
-            void print_handles( bool only_active = false, std::basic_ostream<_Char> &out = std::cout ) const {
+            void print_handles( std::basic_ostream<_Char> &out, bool only_active = false ) const {
                 typedef void *UV_QUEUE[2];
 #ifndef _WIN32
                 enum {

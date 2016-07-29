@@ -7,13 +7,11 @@
 
 #include "fwd.hpp"
 
-#include "defines.hpp"
 #include "exception.hpp"
 #include "type_traits.hpp"
 
 #include "detail/handle_detail.hpp"
 
-#include <memory>
 #include <future>
 
 namespace uv {
@@ -83,7 +81,7 @@ namespace uv {
             virtual void stop() = 0;
 
             virtual void start() {
-                throw new Exception( UV_ENOSYS );
+                throw new ::uv::Exception( UV_ENOSYS );
             };
 
             inline Loop *loop() {
