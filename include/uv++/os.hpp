@@ -385,6 +385,14 @@ namespace uv {
 
             return u;
         }
+
+        void kill( int pid, int signum ) {
+            int res = uv_kill( pid, signum );
+
+            if( res != 0 ) {
+                throw ::uv::Exception( res );
+            }
+        }
     }
 }
 
