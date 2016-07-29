@@ -142,12 +142,14 @@ namespace uv {
             }
 
             template <typename Functor>
-            inline std::pair<std::future<void>, std::shared_future<void>> stop( Functor f ) {
+            inline std::pair<std::future<void>, std::shared_ptr<std::shared_future<void>>>
+            stop( Functor f ) {
                 return this->close( f );
             }
 
             template <typename Functor>
-            std::pair<std::future<void>, std::shared_future<void>> close( Functor );
+            std::pair<std::future<void>, std::shared_ptr<std::shared_future<void>>>
+            close( Functor );
 
             inline handle_type guess_handle() const {
                 return (handle_type)uv_guess_handle( this->handle()->type );

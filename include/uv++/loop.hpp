@@ -428,8 +428,12 @@ namespace uv {
 
     template <typename H, typename D>
     template <typename Functor>
-    inline std::pair<std::future<void>, std::shared_future<void>> Handle<H, D>::close( Functor f ) {
+    std::pair<std::future<void>, std::shared_ptr<std::shared_future<void>>>
+    Handle<H, D>::close( Functor f ) {
         typedef detail::CloseHelperContinuation<Functor> Cont;
+
+        auto current_thread = std::this_thread::get_id();
+        auto loop_thread    = this->loop()->loop_thread;
 
         auto c = std::make_shared<Cont>( f );
 
@@ -454,23 +458,22 @@ namespace uv {
             d->secondary_continuation.reset();
         }};
 
-#ifdef UV_USE_BOOST_LOCKFREE
-        this->loop()->close_queue.push( queue_data );
-#else
-        auto current_thread = std::this_thread::get_id();
-        auto loop_thread    = this->loop()->loop_thread;
+        if( current_thread == loop_thread ) {
+            uv_close( queue_data.first, queue_data.second );
 
-        if( current_thread != loop_thread ) {
+            return std::make_pair( c->p.get_future(), nullptr );
+
+        } else {
+#ifdef UV_USE_BOOST_LOCKFREE
+            this->loop()->close_queue.push( queue_data );
+#else
             std::lock_guard<std::mutex> lock( this->loop()->close_mutex );
 
             this->loop()->close_queue.push_back( queue_data );
-
-        } else {
-            this->loop()->close_queue.push_back( queue_data );
-        }
 #endif
-
-        return std::make_pair( c->p.get_future(), this->loop()->close_async->send());
+            return std::make_pair( c->p.get_future(),
+                                   std::make_shared<std::shared_future<void>>( this->loop()->close_async->send()));
+        }
     }
 
     void Filesystem::init( Loop *l ) {
