@@ -52,21 +52,6 @@ namespace uv {
 
                 return ret;
             }
-
-            inline void stop() {
-                this->close( []( auto & ) {} );
-            }
-
-            template <typename Functor>
-            std::shared_future<void> stop( Functor f ) {
-                return this->close( f );
-            }
-
-            ~Async() {
-                if( this->is_active()) {
-                    this->stop();
-                }
-            }
     };
 }
 

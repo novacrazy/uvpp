@@ -137,10 +137,19 @@ namespace uv {
                 return uv_handle_size( this->handle()->type );
             }
 
-            template <typename Functor>
-            std::shared_future<void> close( Functor );
+            inline void stop() {
+                this->close( []( auto & ) {} );
+            }
 
-            handle_type guess_handle() const {
+            template <typename Functor>
+            inline std::pair<std::future<void>, std::shared_future<void>> stop( Functor f ) {
+                return this->close( f );
+            }
+
+            template <typename Functor>
+            std::pair<std::future<void>, std::shared_future<void>> close( Functor );
+
+            inline handle_type guess_handle() const {
                 return (handle_type)uv_guess_handle( this->handle()->type );
             }
 
@@ -197,12 +206,6 @@ namespace uv {
             inline void stop() {
                 uv_idle_stop( &_handle );
             }
-
-            ~Idle() {
-                if( this->is_active()) {
-                    this->stop();
-                }
-            }
     };
 
     class Prepare final : public Handle<uv_prepare_t, Prepare> {
@@ -233,12 +236,6 @@ namespace uv {
             inline void stop() {
                 uv_prepare_stop( &_handle );
             }
-
-            ~Prepare() {
-                if( this->is_active()) {
-                    this->stop();
-                }
-            }
     };
 
     class Check final : public Handle<uv_check_t, Check> {
@@ -268,12 +265,6 @@ namespace uv {
 
             inline void stop() {
                 uv_check_stop( &_handle );
-            }
-
-            ~Check() {
-                if( this->is_active()) {
-                    this->stop();
-                }
             }
     };
 
@@ -318,12 +309,6 @@ namespace uv {
             inline void stop() {
                 uv_timer_stop( &_handle );
             }
-
-            ~Timer() {
-                if( this->is_active()) {
-                    this->stop();
-                }
-            }
     };
 
     class Signal final : public Handle<uv_signal_t, Signal> {
@@ -357,12 +342,6 @@ namespace uv {
 
             inline void stop() {
                 uv_signal_stop( &_handle );
-            }
-
-            ~Signal() {
-                if( this->is_active()) {
-                    this->stop();
-                }
             }
     };
 
