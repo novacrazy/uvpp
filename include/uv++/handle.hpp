@@ -10,8 +10,8 @@
 #include "detail/data.hpp"
 
 #include "exception.hpp"
-#include "type_traits.hpp"
 
+#include "detail/type_traits.hpp"
 #include "detail/handle.hpp"
 
 #include <future>

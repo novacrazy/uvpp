@@ -8,9 +8,10 @@
 #include "fwd.hpp"
 
 #include "exception.hpp"
-#include "type_traits.hpp"
 
-#include "utils.hpp"
+#include "detail/type_traits.hpp"
+#include "detail/utils.hpp"
+
 #include "handle.hpp"
 #include "async.hpp"
 #include "fs.hpp"
@@ -165,7 +166,7 @@ namespace uv {
             }
 
             template <typename... Args>
-            typename std::enable_if<all_type<uv_loop_option, Args...>::value, Loop &>::type
+            typename std::enable_if<detail::all_type<uv_loop_option, Args...>::value, Loop &>::type
             inline configure( Args &&... args ) {
                 auto res = uv_loop_configure( handle(), std::forward<Args>( args )... );
 
