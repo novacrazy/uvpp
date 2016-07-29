@@ -20,6 +20,17 @@ namespace uv {
     inline bool is_any( T ) {
         return false;
     }
+
+    namespace detail {
+        template <typename A, typename B>
+        struct TrivialPair {
+            typedef A first_type;
+            typedef B second_type;
+
+            first_type  first;
+            second_type second;
+        };
+    }
 }
 
 #endif //UV_UTILS_HPP
