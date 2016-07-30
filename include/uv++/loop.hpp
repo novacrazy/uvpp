@@ -13,7 +13,6 @@
 #include "detail/utils.hpp"
 
 #include "handle.hpp"
-#include "async.hpp"
 #include "fs.hpp"
 
 #include <thread>
