@@ -37,18 +37,14 @@ namespace uv {
             }
 
             template <typename... Args>
-            inline std::shared_future<R> send( Args &&... args ) {
+            inline std::shared_future<R> send( Args... args ) {
                 typedef detail::AsyncContinuation<void *, P, R> Cont;
 
                 Cont *c = static_cast<Cont *>(this->internal_data.continuation.get());
 
-                std::atomic_bool should_send( true );
+                auto ret = c->init( std::forward<Args>( args )... );
 
-                auto ret = c->init( should_send, std::forward<Args>( args )... );
-
-                if( should_send ) {
-                    uv_async_send( this->handle());
-                }
+                uv_async_send( this->handle());
 
                 return ret;
             }

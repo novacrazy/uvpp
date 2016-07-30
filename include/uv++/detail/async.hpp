@@ -9,31 +9,17 @@
 
 #include <memory>
 #include <future>
-#include <atomic>
 
 namespace uv {
     namespace detail {
-        enum {
-            ASYNC_STATUS_INCOMPLETE,
-            ASYNC_STATUS_COMPLETED,
-            ASYNC_STATUS_THREW
-        };
-
         template <typename K>
         struct dispatch_helper {
             template <typename Functor, typename T, typename... Args>
-            static inline void
-            dispatch( std::promise<K> &result, Functor f, std::atomic_int &status, T *t, Args... args ) {
+            static inline void dispatch( std::promise<K> &result, Functor f, T *t, Args... args ) {
                 try {
-                    auto &&r = f( *t, std::forward<Args>( args )... );
-
-                    status = ASYNC_STATUS_COMPLETED;
-
-                    result.set_value( r );
+                    result.set_value( f( *t, std::forward<Args>( args )... ));
 
                 } catch( ... ) {
-                    status = ASYNC_STATUS_THREW;
-
                     result.set_exception( std::current_exception());
                 }
             }
@@ -42,18 +28,13 @@ namespace uv {
         template <>
         struct dispatch_helper<void> {
             template <typename Functor, typename T, typename... Args>
-            static inline void
-            dispatch( std::promise<void> &result, Functor f, std::atomic_int &status, T *t, Args... args ) {
+            static inline void dispatch( std::promise<void> &result, Functor f, T *t, Args... args ) {
                 try {
                     f( *t, std::forward<Args>( args )... );
-
-                    status = ASYNC_STATUS_COMPLETED;
 
                     result.set_value();
 
                 } catch( ... ) {
-                    status = ASYNC_STATUS_THREW;
-
                     result.set_exception( std::current_exception());
                 }
             }
@@ -66,30 +47,17 @@ namespace uv {
 
             std::shared_ptr<std::promise<return_type>>       r;
             std::shared_ptr<std::shared_future<return_type>> s;
-            std::atomic_int                                  status;
+            std::mutex                                       m;
 
             inline AsyncContinuationBase( Functor f )
-                : Continuation<Functor>( f ), status( ASYNC_STATUS_INCOMPLETE ) {
+                : Continuation<Functor>( f ) {
             }
 
-            inline std::shared_future<return_type> base_init( std::atomic_bool &should_send ) {
-                //Atomically test if the last dispatch threw and replace it with ASYNC_STATUS_INCOMPLETE for the next dispatch
-                if( this->status.exchange( ASYNC_STATUS_INCOMPLETE ) == ASYNC_STATUS_THREW ) {
-                    std::shared_future<return_type> old_s = *this->s;
+            inline std::shared_future<return_type> base_init() {
+                this->r = std::make_shared<std::promise<return_type >>();
+                this->s = std::make_shared<std::shared_future<return_type >>( this->r->get_future());
 
-                    this->r.reset();
-                    this->s.reset();
-
-                    should_send = false;
-
-                    return old_s;
-
-                } else {
-                    this->r = std::make_shared<std::promise<return_type >>();
-                    this->s = std::make_shared<std::shared_future<return_type >>( this->r->get_future());
-
-                    return *this->s;
-                }
+                return *this->s;
             }
         };
 
@@ -106,25 +74,20 @@ namespace uv {
 
             template <typename T>
             inline void dispatch( T *t ) {
-                dispatch_helper<return_type>::dispatch( *this->r, this->f, this->status, t, *p );
+                std::lock_guard<std::mutex> lock( this->m );
 
-                /*
-                 * After dispatch, the status flag will be ASYNC_STATUS_COMPLETED, unless there was a another call to
-                 * send in the time between the callback returning and the dispatch function returning.
-                 *
-                 * I should point out this can happen, and it's a very annoying data race.
-                 * */
+                dispatch_helper<return_type>::dispatch( *this->r, this->f, t, *p );
 
-                if( this->status == ASYNC_STATUS_COMPLETED ) {
-                    p.reset();
-                }
+                p.reset();
             }
 
             template <typename... Args>
-            inline std::shared_future<return_type> init( std::atomic_bool &should_send, Args &&... args ) {
+            inline std::shared_future<return_type> init( Args &&... args ) {
+                std::lock_guard<std::mutex> lock( this->m );
+
                 this->p = std::make_shared<parameter_type>( std::forward<Args>( args )... );
 
-                return this->base_init( should_send );
+                return this->base_init();
             }
         };
 
@@ -139,12 +102,16 @@ namespace uv {
 
             template <typename T>
             inline void dispatch( T *t ) {
-                dispatch_helper<return_type>::dispatch( *this->r, this->f, this->status, t );
+                std::lock_guard<std::mutex> lock( this->m );
+
+                dispatch_helper<return_type>::dispatch( *this->r, this->f, t );
             }
 
             template <typename... Args>
-            inline std::shared_future<return_type> init( std::atomic_bool &should_send ) {
-                return this->base_init( should_send );
+            inline std::shared_future<return_type> init() {
+                std::lock_guard<std::mutex> lock( this->m );
+
+                return this->base_init();
             }
         };
     }
