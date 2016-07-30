@@ -353,6 +353,13 @@ namespace uv {
                     return ret;
                 }
             }
+
+            template <typename... Args>
+            inline std::future<R> send_defer( Args... args ) {
+                return std::async( std::launch::deferred, [this]( Args... inner_args ) {
+                    return this->send( std::forward<Args>( inner_args )... ).get();
+                }, std::forward<Args>( args )... );
+            }
     };
 
     class Signal final : public Handle<uv_signal_t, Signal> {
