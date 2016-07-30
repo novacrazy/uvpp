@@ -47,17 +47,26 @@ namespace uv {
 
             std::shared_ptr<std::promise<return_type>>       r;
             std::shared_ptr<std::shared_future<return_type>> s;
-            std::mutex                                       m;
 
             inline AsyncContinuationBase( Functor f )
                 : Continuation<Functor>( f ) {
             }
 
             inline std::shared_future<return_type> base_init() {
-                this->r = std::make_shared<std::promise<return_type >>();
-                this->s = std::make_shared<std::shared_future<return_type >>( this->r->get_future());
+                if( !this->r ) {
+                    this->r = std::make_shared<std::promise<return_type >>();
+                }
+
+                if( !this->s ) {
+                    this->s = std::make_shared<std::shared_future<return_type >>( this->r->get_future());
+                }
 
                 return *this->s;
+            }
+
+            inline void cleanup() {
+                this->r.reset();
+                this->s.reset();
             }
         };
 
@@ -74,17 +83,15 @@ namespace uv {
 
             template <typename T>
             inline void dispatch( T *t ) {
-                std::lock_guard<std::mutex> lock( this->m );
-
                 dispatch_helper<return_type>::dispatch( *this->r, this->f, t, *p );
+
+                this->cleanup();
 
                 p.reset();
             }
 
             template <typename... Args>
             inline std::shared_future<return_type> init( Args &&... args ) {
-                std::lock_guard<std::mutex> lock( this->m );
-
                 this->p = std::make_shared<parameter_type>( std::forward<Args>( args )... );
 
                 return this->base_init();
@@ -102,15 +109,13 @@ namespace uv {
 
             template <typename T>
             inline void dispatch( T *t ) {
-                std::lock_guard<std::mutex> lock( this->m );
-
                 dispatch_helper<return_type>::dispatch( *this->r, this->f, t );
+
+                this->cleanup();
             }
 
             template <typename... Args>
             inline std::shared_future<return_type> init() {
-                std::lock_guard<std::mutex> lock( this->m );
-
                 return this->base_init();
             }
         };

@@ -12,7 +12,7 @@
 namespace uv {
     class Exception;
 
-    template <typename>
+    template <typename, typename>
     class HandleBase;
 
     template <typename, typename>

@@ -23,20 +23,22 @@ namespace uv {
         std::shared_ptr<void> continuation;
 
         //Only used for close callbacks
-        std::shared_ptr<void> secondary_continuation;
+        std::shared_ptr<void> close_continuation;
 
         void *self;
 
-        HandleData( void *s ) : self( s ) {
+        HandleData( void *s )
+            : self( s ) {
             assert( s != nullptr );
         }
     };
 
-    template <typename H>
-    class HandleBase : public std::enable_shared_from_this<HandleBase<H>>,
+    template <typename H, typename D>
+    class HandleBase : public std::enable_shared_from_this<D>,
                        public detail::UserDataAccess<HandleData, H> {
         public:
             typedef typename detail::UserDataAccess<HandleData, H>::handle_t handle_t;
+            typedef D                                                        derived_type;
 
         protected:
             HandleData internal_data;
@@ -78,10 +80,10 @@ namespace uv {
     };
 
     template <typename H, typename D>
-    class Handle : public HandleBase<H> {
+    class Handle : public HandleBase<H, D> {
         public:
-            typedef typename HandleBase<H>::handle_t handle_t;
-            typedef D                                derived_type;
+            typedef typename HandleBase<H, D>::handle_t     handle_t;
+            typedef typename HandleBase<H, D>::derived_type derived_type;
 
             enum class handle_type : std::underlying_type<uv_handle_type>::type {
                     UNKNOWN_HANDLE = 0,
@@ -94,7 +96,8 @@ namespace uv {
 
 
         protected:
-            handle_t _handle;
+            handle_t         _handle;
+            std::atomic_bool closing;
 
         public:
             inline const handle_t *handle() const {
@@ -110,7 +113,7 @@ namespace uv {
             }
 
             inline bool is_closing() const {
-                return uv_is_closing((uv_handle_t *)( this->handle())) != 0;
+                return this->closing || uv_is_closing((uv_handle_t *)( this->handle())) != 0;
             }
 
             inline size_t size() {
@@ -122,14 +125,12 @@ namespace uv {
             }
 
             template <typename Functor>
-            inline std::pair<std::future<void>, std::shared_ptr<std::shared_future<void>>>
-            stop( Functor f ) {
+            inline std::future<void> stop( Functor f ) {
                 return this->close( f );
             }
 
             template <typename Functor>
-            std::pair<std::future<void>, std::shared_ptr<std::shared_future<void>>>
-            close( Functor );
+            std::future<void> close( Functor );
 
             inline handle_type guess_handle() const {
                 return (handle_type)uv_guess_handle( this->handle()->type );
@@ -154,6 +155,12 @@ namespace uv {
 #undef XX
                     default:
                         return "UNKNOWN_HANDLE";
+                }
+            }
+
+            ~Handle() {
+                if( !this->is_closing()) {
+                    this->stop();
                 }
             }
     };
@@ -303,6 +310,8 @@ namespace uv {
                 //No-op for uv_async_t
             }
 
+            std::mutex m;
+
         public:
             template <typename Functor>
             inline void start( Functor f ) {
@@ -312,6 +321,10 @@ namespace uv {
 
                 uv_async_init( this->_loop, this->handle(), []( uv_async_t *h ) {
                     HandleData *d = static_cast<HandleData *>(h->data);
+
+                    auto *self = static_cast<Async<P, R> *>(d->self);
+
+                    std::lock_guard<std::mutex> lock( self->m );
 
                     Cont *c = static_cast<Cont *>(d->continuation.get());
 
@@ -323,13 +336,22 @@ namespace uv {
             inline std::shared_future<R> send( Args... args ) {
                 typedef detail::AsyncContinuation<void *, P, R> Cont;
 
-                Cont *c = static_cast<Cont *>(this->internal_data.continuation.get());
+                std::lock_guard<std::mutex> lock( this->m );
 
-                auto ret = c->init( std::forward<Args>( args )... );
+                if( this->closing ) {
+                    return std::async( std::launch::deferred, []() -> R {
+                        throw ::uv::Exception( "async handle closed" );
+                    } ).share();
 
-                uv_async_send( this->handle());
+                } else {
+                    Cont *c = static_cast<Cont *>(this->internal_data.continuation.get());
 
-                return ret;
+                    auto ret = c->init( std::forward<Args>( args )... );
+
+                    uv_async_send( this->handle());
+
+                    return ret;
+                }
             }
     };
 
@@ -369,8 +391,8 @@ namespace uv {
 
     template <typename D>
     struct HandleHash {
-        typedef HandleBase<typename D::handle_t> *argument_type;
-        typedef std::size_t                      result_type;
+        typedef HandleBase<typename D::handle_t, D> *argument_type;
+        typedef std::size_t                         result_type;
 
         result_type operator()( argument_type const &h ) const {
             return reinterpret_cast<size_t>(h->handle());

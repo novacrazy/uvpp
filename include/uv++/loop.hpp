@@ -35,9 +35,9 @@
 #endif
 
 namespace uv {
-    class Loop final : public HandleBase<uv_loop_t> {
+    class Loop final : public HandleBase<uv_loop_t, Loop> {
         public:
-            typedef typename HandleBase<uv_loop_t>::handle_t handle_t;
+            typedef typename HandleBase<uv_loop_t, Loop>::handle_t handle_t;
 
             template <typename H, typename D>
             friend
@@ -60,6 +60,7 @@ namespace uv {
 
             typedef std::unordered_set<std::shared_ptr<void>>                       handle_set_type;
             handle_set_type                                                         handle_set;
+            std::mutex                                                              handle_set_mutex;
 
             typedef detail::TrivialPair<uv_handle_t *, void ( * )( uv_handle_t * )> close_args;
 
@@ -256,13 +257,8 @@ namespace uv {
             }
 
             ~Loop() {
-                for( std::shared_ptr<void> x : handle_set ) {
-                    static_cast<HandleBase<uv_handle_t> *>(x.get())->stop();
-                }
-
                 if( !this->external ) {
                     this->stop();
-
                     delete handle();
                 }
             }
@@ -270,6 +266,8 @@ namespace uv {
         protected:
             template <typename H, typename... Args>
             inline std::shared_ptr<H> new_handle( Args &&... args ) {
+                std::lock_guard<std::mutex> lock( this->handle_set_mutex );
+
                 std::shared_ptr<H> p = std::make_shared<H>();
 
                 auto it_inserted = handle_set.insert( p );
@@ -445,8 +443,8 @@ namespace uv {
         return default_loop_ptr;
     }
 
-    template <typename H>
-    inline void HandleBase<H>::init( Loop *l ) {
+    template <typename H, typename D>
+    inline void HandleBase<H, D>::init( Loop *l ) {
         assert( l != nullptr );
 
         this->init( l, l->handle());
@@ -459,57 +457,78 @@ namespace uv {
                 : Continuation<Functor>( f ) {
             }
 
-            std::promise<void> p;
+            std::promise<void> result;
         };
     }
 
     template <typename H, typename D>
     template <typename Functor>
-    std::pair<std::future<void>, std::shared_ptr<std::shared_future<void>>>
-    Handle<H, D>::close( Functor f ) {
+    std::future<void> Handle<H, D>::close( Functor f ) {
         typedef detail::CloseHelperContinuation<Functor> Cont;
 
-        auto current_thread = std::this_thread::get_id();
-        auto loop_thread    = this->loop()->loop_thread;
+        /*
+         * Using the atomic compare and exchange code below, this can atomically test whether closing is true, and if it
+         * isn't, then set it to true for the upcoming close. It also ensures expect_closing is equal to closing before
+         * the exchange.
+         * */
 
-        auto c = std::make_shared<Cont>( f );
+        bool expect_closing = false;
 
-        this->internal_data.secondary_continuation = c;
+        this->closing.compare_exchange_strong( expect_closing, true );
 
-        auto queue_data = Loop::close_args{ (uv_handle_t *)( this->handle()), []( uv_handle_t *h ) {
-            HandleData *d = static_cast<HandleData *>(h->data);
-
-            typename Handle<H, D>::derived_type *self = static_cast<typename Handle<H, D>::derived_type *>(d->self);
-
-            Cont *c2 = static_cast<Cont *>(d->secondary_continuation.get());
-
-            try {
-                c2->f( *self );
-
-                c2->p.set_value();
-
-            } catch( ... ) {
-                c2->p.set_exception( std::current_exception());
-            }
-
-            d->secondary_continuation.reset();
-        }};
-
-        if( current_thread == loop_thread ) {
-            uv_close( queue_data.first, queue_data.second );
-
-            return std::make_pair( c->p.get_future(), nullptr );
+        if( expect_closing ) {
+            //All this does is execute the functor given when future.get() is called. No extra threads for deferred
+            return std::async( std::launch::deferred, []() {
+                throw ::uv::Exception( "handle already closing or closed" );
+            } );
 
         } else {
-#ifdef UV_USE_BOOST_LOCKFREE
-            this->loop()->close_queue.push( queue_data );
-#else
-            std::lock_guard<std::mutex> lock( this->loop()->close_mutex );
+            //Will need c later to get the future
+            auto c = std::make_shared<Cont>( f );
 
-            this->loop()->close_queue.push_back( queue_data );
+            this->internal_data.close_continuation = c;
+
+            auto queue_data = Loop::close_args{ (uv_handle_t *)( this->handle()), []( uv_handle_t *h ) {
+                HandleData *d = static_cast<HandleData *>(h->data);
+
+                auto *self = static_cast<typename Handle<H, D>::derived_type *>(d->self);
+
+                Cont *sc = static_cast<Cont *>(d->close_continuation.get());
+
+                try {
+                    sc->f( *self );
+
+                    sc->result.set_value();
+
+                } catch( ... ) {
+                    sc->result.set_exception( std::current_exception());
+                }
+
+                //It's fine to reset the close_continuation (and delete the promise) since it's already been resolved above
+                d->close_continuation.reset();
+            }};
+
+            if( std::this_thread::get_id() == this->loop()->loop_thread ) {
+                /*
+                 * If we're on the same thread as the event loop, we can call uv_close here with no issues
+                 * */
+
+                uv_close( queue_data.first, queue_data.second );
+
+            } else {
+#ifdef UV_USE_BOOST_LOCKFREE
+                this->loop()->close_queue.push( queue_data );
+#else
+                //Only lock the duration of the push_back
+                std::lock_guard<std::mutex> lock( this->loop()->close_mutex );
+
+                this->loop()->close_queue.push_back( queue_data );
 #endif
-            return std::make_pair( c->p.get_future(),
-                                   std::make_shared<std::shared_future<void>>( this->loop()->close_async->send()));
+            }
+
+            this->loop()->close_async->send();
+
+            return c->result.get_future();
         }
     }
 
