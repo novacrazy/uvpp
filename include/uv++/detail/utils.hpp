@@ -7,6 +7,11 @@
 
 namespace uv {
     namespace detail {
+        /*
+         * The is_any function is to compare a value to any number of other values, generating a long string of
+         * (value == other1) || (value == other2) || ... etc
+         * */
+
         template <typename T, typename K>
         inline bool is_any( T val, K val2 ) {
             return val == val2;
@@ -22,6 +27,16 @@ namespace uv {
             return false;
         }
 
+        /*
+         * This exists because Boost lockfree structures require types that can be trivially copied,
+         * with absolutely no overloaded operator= in them. So that rules out std::pair
+         *
+         * This also doesn't have a constructor because I can use TrivialPair{first_value, second_value}
+         * semantics to initialize it. Note the curly braces instead of parenthesis.
+         *
+         * It's about as basic a pair structure as you can get, which is the idea. It's just going to be holding
+         * pointers or other primitive types anyway.
+         * */
         template <typename A, typename B>
         struct TrivialPair {
             typedef A first_type;
@@ -29,17 +44,6 @@ namespace uv {
 
             first_type  first;
             second_type second;
-        };
-
-        template <typename T, typename K, K value>
-        struct SetValueOnScopeExit {
-            T &t;
-
-            inline SetValueOnScopeExit( T &_t ) : t( _t ) {}
-
-            inline ~SetValueOnScopeExit() {
-                t = value;
-            }
         };
     }
 }
