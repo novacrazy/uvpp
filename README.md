@@ -26,12 +26,15 @@ The github name is uvpp because github didn't like uv++ as the repository name. 
     - Idle, Prepare and Check handles
     - Async handles
         - Capable of bidirectional communication, even between threads
+        - Automatically deduces return and parameter types, even with lambda functions
+            - Any number of additional parameters are supported.
+        - Fully type safe, even with variadic parameters.
     - Signal handles
     
 * Misc OS and Net functions
 
 * Automatic memory management for everything
-    
+
 * Optional ability to use Boost lockfree data structures where applicable.
 
 ### Still to do
