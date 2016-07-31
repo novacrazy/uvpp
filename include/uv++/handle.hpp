@@ -121,7 +121,7 @@ namespace uv {
             }
 
             inline void stop() {
-                this->close( []( auto & ) {} );
+                this->close( []() {} );
             }
 
             template <typename Functor>
@@ -179,7 +179,7 @@ namespace uv {
         public:
             template <typename Functor>
             inline void start( Functor f ) {
-                typedef detail::Continuation<Functor> Cont;
+                typedef detail::Continuation<Functor, Idle> Cont;
 
                 this->internal_data.continuation = std::make_shared<Cont>( f );
 
@@ -188,7 +188,7 @@ namespace uv {
 
                     Idle *self = static_cast<Idle *>(d->self);
 
-                    static_cast<Cont *>(d->continuation.get())->f( self );
+                    static_cast<Cont *>(d->continuation.get())->dispatch( self );
                 } );
             }
 
@@ -209,7 +209,7 @@ namespace uv {
         public:
             template <typename Functor>
             inline void start( Functor f ) {
-                typedef detail::Continuation<Functor> Cont;
+                typedef detail::Continuation<Functor, Prepare> Cont;
 
                 this->internal_data.continuation = std::make_shared<Cont>( f );
 
@@ -218,7 +218,7 @@ namespace uv {
 
                     Prepare *self = static_cast<Prepare *>(d->self);
 
-                    static_cast<Cont *>(d->continuation.get())->f( self );
+                    static_cast<Cont *>(d->continuation.get())->dispatch( self );
                 } );
             }
 
@@ -239,7 +239,7 @@ namespace uv {
         public:
             template <typename Functor>
             inline void start( Functor f ) {
-                typedef detail::Continuation<Functor> Cont;
+                typedef detail::Continuation<Functor, Check> Cont;
 
                 this->internal_data.continuation = std::make_shared<Cont>( f );
 
@@ -248,7 +248,7 @@ namespace uv {
 
                     Check *self = static_cast<Check *>(d->self);
 
-                    static_cast<Cont *>(d->continuation.get())->f( self );
+                    static_cast<Cont *>(d->continuation.get())->dispatch( self );
                 } );
             }
 
@@ -278,16 +278,16 @@ namespace uv {
 
                 typedef std::chrono::duration<uint64_t, std::milli> millis;
 
-                typedef detail::Continuation<Functor> Cont;
+                typedef detail::Continuation<Functor, Timer> Cont;
 
                 this->internal_data.continuation = std::make_shared<Cont>( f );
 
                 uv_timer_start( &_handle, []( uv_timer_t *h ) {
                                     HandleData *d = static_cast<HandleData *>(h->data);
 
-                                    Check *self = static_cast<Check *>(d->self);
+                                    Timer *self = static_cast<Timer *>(d->self);
 
-                                    static_cast<Cont *>(d->continuation.get())->f( self );
+                                    static_cast<Cont *>(d->continuation.get())->dispatch( self );
                                 },
                     //libuv expects milliseconds, so convert any duration given to milliseconds
                                 std::chrono::duration_cast<millis>( timeout ).count(),
@@ -323,13 +323,14 @@ namespace uv {
         protected:
             std::mutex m;
 
-            typedef detail::AsyncContinuation<Functor> Continuation;
+            typedef detail::AsyncContinuation<Functor, Async> Continuation;
 
             typedef typename detail::function_traits<Functor>::result_type result_type;
             typedef typename detail::function_traits<Functor>::tuple_type  tuple_type;
 
             enum {
-                arity = detail::function_traits<Functor>::arity - 1
+                arity =
+                detail::function_traits<Functor>::arity - ( detail::ContinuationNeedsSelf<Functor, Async>::value )
             };
 
         public:
@@ -406,7 +407,7 @@ namespace uv {
         public:
             template <typename Functor>
             inline void start( int signum, Functor f ) {
-                typedef detail::Continuation<Functor> Cont;
+                typedef detail::Continuation<Functor, Signal> Cont;
 
                 this->internal_data.continuation = std::make_shared<Cont>( f );
 
@@ -415,7 +416,7 @@ namespace uv {
 
                     Signal *self = static_cast<Signal *>(d->self);
 
-                    static_cast<Cont *>(d->continuation.get())->f( self, sn );
+                    static_cast<Cont *>(d->continuation.get())->dispatch( self, sn );
                 }, signum );
             }
 

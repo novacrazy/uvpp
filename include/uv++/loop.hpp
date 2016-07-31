@@ -82,7 +82,7 @@ namespace uv {
                     uv_loop_init( this->handle());
                 }
 
-                this->close_async = this->async( [this]( Async *a ) -> void {
+                this->close_async = this->async( [this]() -> void {
 #ifdef UV_USE_BOOST_LOCKFREE
                     this->close_queue.consume_all( []( close_args &c ) {
                         uv_close( c.first, c.second );
@@ -453,10 +453,10 @@ namespace uv {
     }
 
     namespace detail {
-        template <typename Functor>
-        struct CloseHelperContinuation : public Continuation<Functor> {
+        template <typename Functor, typename Self>
+        struct CloseHelperContinuation : public Continuation<Functor, Self> {
             inline CloseHelperContinuation( Functor f )
-                : Continuation<Functor>( f ) {
+                : Continuation<Functor, Self>( f ) {
             }
 
             std::promise<void> result;
@@ -466,7 +466,7 @@ namespace uv {
     template <typename H, typename D>
     template <typename Functor>
     std::future<void> Handle<H, D>::close( Functor f ) {
-        typedef detail::CloseHelperContinuation<Functor> Cont;
+        typedef detail::CloseHelperContinuation<Functor, D> Cont;
 
         /*
          * Using the atomic compare and exchange code below, this can atomically test whether closing is true, and if it
@@ -498,7 +498,7 @@ namespace uv {
                 Cont *sc = static_cast<Cont *>(d->close_continuation.get());
 
                 try {
-                    sc->f( *self );
+                    sc->dispatch( self );
 
                     sc->result.set_value();
 

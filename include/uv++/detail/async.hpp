@@ -16,8 +16,8 @@ namespace uv {
     namespace detail {
         template <typename R>
         struct dispatch_helper {
-            template <typename Functor, typename K>
-            static inline void dispatch( std::promise<R> &result, Functor f, K args ) {
+            template <typename Functor, typename... Args>
+            static inline void dispatch( std::promise<R> &result, Functor f, std::tuple<Args...> &&args ) {
                 try {
                     result.set_value( invoke( f, args ));
 
@@ -29,8 +29,8 @@ namespace uv {
 
         template <>
         struct dispatch_helper<void> {
-            template <typename Functor, typename K>
-            static inline void dispatch( std::promise<void> &result, Functor f, K args ) {
+            template <typename Functor, typename... Args>
+            static inline void dispatch( std::promise<void> &result, Functor f, std::tuple<Args...> &&args ) {
                 try {
                     invoke( f, args );
 
@@ -42,8 +42,8 @@ namespace uv {
             }
         };
 
-        template <typename Functor>
-        struct AsyncContinuationBase : public Continuation<Functor> {
+        template <typename Functor, typename Self>
+        struct AsyncContinuationBase : public Continuation<Functor, Self> {
             typedef typename detail::function_traits<Functor>::result_type result_type;
             typedef typename detail::function_traits<Functor>::tuple_type  tuple_type;
 
@@ -51,7 +51,7 @@ namespace uv {
             std::shared_ptr<std::shared_future<result_type>> s;
 
             inline AsyncContinuationBase( Functor f )
-                : Continuation<Functor>( f ) {
+                : Continuation<Functor, Self>( f ) {
             }
 
             inline std::shared_future<result_type> base_init() {
@@ -72,13 +72,15 @@ namespace uv {
             }
         };
 
-        template <typename Functor, size_t arity = detail::function_traits<Functor>::arity>
-        struct AsyncContinuation : public AsyncContinuationBase<Functor> {
-            typedef typename AsyncContinuationBase<Functor>::tuple_type  tuple_type;
-            typedef typename AsyncContinuationBase<Functor>::result_type result_type;
+        template <typename Functor, typename Self, size_t arity = detail::function_traits<Functor>::arity>
+        struct AsyncContinuation : public AsyncContinuationBase<Functor, Self> {
+            typedef typename AsyncContinuationBase<Functor, Self>::tuple_type  tuple_type;
+            typedef typename AsyncContinuationBase<Functor, Self>::result_type result_type;
+
+            typedef ContinuationNeedsSelf <Functor, Self> needs_self;
 
             inline AsyncContinuation( Functor f )
-                : AsyncContinuationBase<Functor>( f ) {
+                : AsyncContinuationBase<Functor, Self>( f ) {
             }
 
             std::shared_ptr<tuple_type> p;
@@ -92,32 +94,84 @@ namespace uv {
                 p.reset();
             }
 
-            template <typename... Args>
-            inline std::shared_future<result_type> init( Args &&... args ) {
+            template <typename T, typename... Args>
+            inline typename std::enable_if<
+                std::is_same<T, Self>::value &&
+                ContinuationNeedsSelf<Functor, T>::value, std::shared_future<result_type>>::type
+            init( T *self, Args &&... args ) {
+                this->p = std::make_shared<tuple_type>( self, std::forward<Args>( args )... );
+
+                return this->base_init();
+            }
+
+            template <typename T, typename... Args>
+            inline typename std::enable_if<
+                std::is_same<T, Self>::value &&
+                !ContinuationNeedsSelf<Functor, T>::value, std::shared_future<result_type>>::type
+            init( T *self, Args &&... args ) {
                 this->p = std::make_shared<tuple_type>( std::forward<Args>( args )... );
 
                 return this->base_init();
             }
         };
 
-        template <typename Functor>
-        struct AsyncContinuation<Functor, 1> : public AsyncContinuationBase<Functor> {
-            typedef typename AsyncContinuationBase<Functor>::result_type result_type;
-            typedef typename AsyncContinuationBase<Functor>::tuple_type  tuple_type;
+        template <typename Functor, typename Self>
+        struct AsyncContinuation<Functor, Self, 1> : public AsyncContinuationBase<Functor, Self> {
+            typedef typename AsyncContinuationBase<Functor, Self>::result_type result_type;
+            typedef typename AsyncContinuationBase<Functor, Self>::tuple_type  tuple_type;
+
+            typedef ContinuationNeedsSelf <Functor, Self> needs_self;
 
             inline AsyncContinuation( Functor f )
-                : AsyncContinuationBase<Functor>( f ) {
+                : AsyncContinuationBase<Functor, Self>( f ) {
             }
 
             template <typename T>
-            inline void dispatch( T *t ) {
+            inline typename std::enable_if<
+                std::is_same<T, Self>::value && ContinuationNeedsSelf<Functor, T>::value>::type
+            dispatch( T *t ) {
                 dispatch_helper<result_type>::dispatch( *this->r, this->f, tuple_type( t ));
 
                 this->cleanup();
             }
 
-            template <typename... Args>
-            inline std::shared_future<result_type> init( Args... args ) {
+            template <typename T>
+            inline typename std::enable_if<
+                std::is_same<T, Self>::value && !ContinuationNeedsSelf<Functor, T>::value>::type
+            dispatch( T *t ) {
+                dispatch_helper<result_type>::dispatch( *this->r, this->f, tuple_type());
+
+                this->cleanup();
+            }
+
+            template <typename T, typename... Args>
+            inline typename std::enable_if<std::is_same<T, Self>::value, std::shared_future<result_type>>::type
+            init( T *self, Args... args ) {
+                return this->base_init();
+            }
+        };
+
+        template <typename Functor, typename Self>
+        struct AsyncContinuation<Functor, Self, 0> : public AsyncContinuationBase<Functor, Self> {
+            typedef typename AsyncContinuationBase<Functor, Self>::result_type result_type;
+            typedef typename AsyncContinuationBase<Functor, Self>::tuple_type  tuple_type;
+
+            typedef ContinuationNeedsSelf <Functor, Self> needs_self;
+
+            inline AsyncContinuation( Functor f )
+                : AsyncContinuationBase<Functor, Self>( f ) {
+            }
+
+            template <typename T>
+            inline void dispatch( T *t ) {
+                dispatch_helper<result_type>::dispatch( *this->r, this->f, tuple_type());
+
+                this->cleanup();
+            }
+
+            template <typename T, typename... Args>
+            inline typename std::enable_if<std::is_same<T, Self>::value, std::shared_future<result_type>>::type
+            init( T *self, Args... args ) {
                 return this->base_init();
             }
         };

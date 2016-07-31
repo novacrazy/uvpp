@@ -5,6 +5,9 @@
 #ifndef UV_HANDLE_DETAIL_HPP
 #define UV_HANDLE_DETAIL_HPP
 
+#include "type_traits.hpp"
+#include "function_traits.hpp"
+
 //For strsignal if available
 #include <csignal>
 #include <cstring>
@@ -19,11 +22,34 @@
 
 namespace uv {
     namespace detail {
-        template <typename Functor>
-        struct Continuation : public std::enable_shared_from_this<Continuation<Functor>> {
+        template <typename Functor, typename Self>
+        using ContinuationNeedsSelf = first_arg_is<Functor, Self *>;
+
+        template <typename Functor, typename Self, bool needs_self = ContinuationNeedsSelf<Functor, Self>::value>
+        struct Continuation : public std::enable_shared_from_this<Continuation<Functor, Self, needs_self>> {
+
             Functor f;
 
             inline Continuation( Functor _f ) : f( _f ) {}
+
+            template <typename... Args>
+            inline decltype( auto ) dispatch( Self *self, Args... args ) {
+                return this->f( self, std::forward<Args>( args )... );
+            }
+        };
+
+        template <typename Functor, typename Self>
+        struct Continuation<Functor, Self, false>
+            : public std::enable_shared_from_this<Continuation<Functor, Self, false>> {
+
+            Functor f;
+
+            inline Continuation( Functor _f ) : f( _f ) {}
+
+            template <typename... Args>
+            inline decltype( auto ) dispatch( Self *self, Args... args ) {
+                return this->f( std::forward<Args>( args )... );
+            }
         };
 
         /*

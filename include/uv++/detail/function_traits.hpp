@@ -150,6 +150,18 @@ namespace uv {
         template <typename T>
         struct function_traits<const volatile T &&> : public function_traits<T> {
         };
+
+        template <typename Functor, typename T, size_t arity = function_traits<Functor>::arity>
+        struct first_arg_is {
+            typedef typename function_traits<Functor>::template arg<0>::type first_arg;
+
+            static constexpr bool value = std::is_same<first_arg, T>::value;
+        };
+
+        template <typename Functor, typename T>
+        struct first_arg_is<Functor, T, 0> : public std::false_type {
+
+        };
     }
 }
 
