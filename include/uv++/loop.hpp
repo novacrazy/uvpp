@@ -528,7 +528,9 @@ namespace uv {
 #endif
             }
 
-            this->loop()->close_async->send_void();
+            auto r = this->loop()->close_async->send_void();
+
+            assert( r.valid());
 
             return c->result.get_future();
         }

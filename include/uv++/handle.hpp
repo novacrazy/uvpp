@@ -310,8 +310,8 @@ namespace uv {
             }
 
         public:
-            virtual void send_void() {
-
+            virtual inline std::shared_future<void> send_void() {
+                return std::shared_future<void>();
             }
     };
 
@@ -385,10 +385,12 @@ namespace uv {
             /*
              * This only exists when there are no arguments to send, so it can be called from Async* directly
              * */
-            template <typename U = Functor,
-                      typename = typename std::enable_if<detail::function_traits<U>::arity == 1>::type>
-            inline void send_void() {
-                this->send();
+            template <typename U = Functor, typename R = result_type,
+                      typename = typename std::enable_if<
+                          detail::function_traits<U>::arity == 1 && std::is_void<R>::value
+                      >::type>
+            inline std::shared_future<void> send_void() {
+                return this->send();
             }
     };
 
