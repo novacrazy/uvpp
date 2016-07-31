@@ -30,6 +30,7 @@ The github name is uvpp because github didn't like uv++ as the repository name. 
             - Any number of additional parameters are supported.
         - Fully type safe, even with variadic parameters.
     - Signal handles
+    - Automatically deduces whether or not the callback requires a pointer to the originating handle
     
 * Misc OS and Net functions
 
