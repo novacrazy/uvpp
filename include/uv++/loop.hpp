@@ -71,8 +71,10 @@ namespace uv {
             std::mutex               close_mutex;
 #endif
 
-            std::shared_ptr<Async<>> close_async;
-            std::thread::id          loop_thread;
+            //typedef decltype( [this]( Async &a ) -> void {} ) close_async_functor;
+
+            std::shared_ptr<Async> close_async;
+            std::thread::id        loop_thread;
 
         protected:
             inline void _init() {
@@ -80,7 +82,7 @@ namespace uv {
                     uv_loop_init( this->handle());
                 }
 
-                this->close_async = this->async( [this]( auto &a ) {
+                this->close_async = this->async( [this]( Async *a ) -> void {
 #ifdef UV_USE_BOOST_LOCKFREE
                     this->close_queue.consume_all( []( close_args &c ) {
                         uv_close( c.first, c.second );
@@ -353,10 +355,10 @@ namespace uv {
                 return new_handle<Timer>( f, timeout, repeat );
             }
 
-            template <typename P = void, typename R = void, typename... Args>
-            inline std::shared_ptr<Async<P, R>> async( Args &&... args ) {
-                return new_handle<Async<P, R>>( std::forward<Args>( args )... );
-            };
+            template <typename Functor>
+            inline std::shared_ptr<AsyncDetail<Functor>> async( Functor f ) {
+                return new_handle<AsyncDetail<Functor>>( f );
+            }
 
             template <typename... Args>
             inline std::shared_ptr<Signal> signal( Args &&... args ) {
@@ -526,7 +528,7 @@ namespace uv {
 #endif
             }
 
-            this->loop()->close_async->send();
+            this->loop()->close_async->send_void();
 
             return c->result.get_future();
         }

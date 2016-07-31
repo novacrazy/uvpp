@@ -6,18 +6,20 @@
 #define UV_ASYNC_DETAIL_HPP
 
 #include "handle.hpp"
+#include "type_traits.hpp"
 
+#include <tuple>
 #include <memory>
 #include <future>
 
 namespace uv {
     namespace detail {
-        template <typename K>
+        template <typename R>
         struct dispatch_helper {
-            template <typename Functor, typename T, typename... Args>
-            static inline void dispatch( std::promise<K> &result, Functor f, T *t, Args... args ) {
+            template <typename Functor, typename K>
+            static inline void dispatch( std::promise<R> &result, Functor f, K args ) {
                 try {
-                    result.set_value( f( *t, std::forward<Args>( args )... ));
+                    result.set_value( invoke( f, args ));
 
                 } catch( ... ) {
                     result.set_exception( std::current_exception());
@@ -27,10 +29,10 @@ namespace uv {
 
         template <>
         struct dispatch_helper<void> {
-            template <typename Functor, typename T, typename... Args>
-            static inline void dispatch( std::promise<void> &result, Functor f, T *t, Args... args ) {
+            template <typename Functor, typename K>
+            static inline void dispatch( std::promise<void> &result, Functor f, K args ) {
                 try {
-                    f( *t, std::forward<Args>( args )... );
+                    invoke( f, args );
 
                     result.set_value();
 
@@ -40,25 +42,25 @@ namespace uv {
             }
         };
 
-        template <typename Functor, typename P, typename R>
+        template <typename Functor>
         struct AsyncContinuationBase : public Continuation<Functor> {
-            typedef P parameter_type;
-            typedef R return_type;
+            typedef typename detail::function_traits<Functor>::result_type result_type;
+            typedef typename detail::function_traits<Functor>::tuple_type  tuple_type;
 
-            std::shared_ptr<std::promise<return_type>>       r;
-            std::shared_ptr<std::shared_future<return_type>> s;
+            std::shared_ptr<std::promise<result_type>>       r;
+            std::shared_ptr<std::shared_future<result_type>> s;
 
             inline AsyncContinuationBase( Functor f )
                 : Continuation<Functor>( f ) {
             }
 
-            inline std::shared_future<return_type> base_init() {
+            inline std::shared_future<result_type> base_init() {
                 if( !this->r ) {
-                    this->r = std::make_shared<std::promise<return_type >>();
+                    this->r = std::make_shared<std::promise<result_type >>();
                 }
 
                 if( !this->s ) {
-                    this->s = std::make_shared<std::shared_future<return_type >>( this->r->get_future());
+                    this->s = std::make_shared<std::shared_future<result_type >>( this->r->get_future());
                 }
 
                 return *this->s;
@@ -70,20 +72,20 @@ namespace uv {
             }
         };
 
-        template <typename Functor, typename P, typename R>
-        struct AsyncContinuation : public AsyncContinuationBase<Functor, P, R> {
-            typedef typename AsyncContinuationBase<Functor, P, R>::parameter_type parameter_type;
-            typedef typename AsyncContinuationBase<Functor, P, R>::return_type    return_type;
+        template <typename Functor, size_t arity = detail::function_traits<Functor>::arity>
+        struct AsyncContinuation : public AsyncContinuationBase<Functor> {
+            typedef typename AsyncContinuationBase<Functor>::tuple_type  tuple_type;
+            typedef typename AsyncContinuationBase<Functor>::result_type result_type;
 
             inline AsyncContinuation( Functor f )
-                : AsyncContinuationBase<Functor, P, R>( f ) {
+                : AsyncContinuationBase<Functor>( f ) {
             }
 
-            std::shared_ptr<parameter_type> p;
+            std::shared_ptr<tuple_type> p;
 
             template <typename T>
-            inline void dispatch( T *t ) {
-                dispatch_helper<return_type>::dispatch( *this->r, this->f, t, *p );
+            inline void dispatch( T * ) {
+                dispatch_helper<result_type>::dispatch( *this->r, this->f, std::move( *p ));
 
                 this->cleanup();
 
@@ -91,31 +93,31 @@ namespace uv {
             }
 
             template <typename... Args>
-            inline std::shared_future<return_type> init( Args &&... args ) {
-                this->p = std::make_shared<parameter_type>( std::forward<Args>( args )... );
+            inline std::shared_future<result_type> init( Args &&... args ) {
+                this->p = std::make_shared<tuple_type>( std::forward<Args>( args )... );
 
                 return this->base_init();
             }
         };
 
-        template <typename Functor, typename R>
-        struct AsyncContinuation<Functor, void, R> : public AsyncContinuationBase<Functor, void, R> {
-            typedef typename AsyncContinuationBase<Functor, void, R>::parameter_type parameter_type;
-            typedef typename AsyncContinuationBase<Functor, void, R>::return_type    return_type;
+        template <typename Functor>
+        struct AsyncContinuation<Functor, 1> : public AsyncContinuationBase<Functor> {
+            typedef typename AsyncContinuationBase<Functor>::result_type result_type;
+            typedef typename AsyncContinuationBase<Functor>::tuple_type  tuple_type;
 
             inline AsyncContinuation( Functor f )
-                : AsyncContinuationBase<Functor, void, R>( f ) {
+                : AsyncContinuationBase<Functor>( f ) {
             }
 
             template <typename T>
             inline void dispatch( T *t ) {
-                dispatch_helper<return_type>::dispatch( *this->r, this->f, t );
+                dispatch_helper<result_type>::dispatch( *this->r, this->f, tuple_type( t ));
 
                 this->cleanup();
             }
 
             template <typename... Args>
-            inline std::shared_future<return_type> init() {
+            inline std::shared_future<result_type> init( Args... args ) {
                 return this->base_init();
             }
         };

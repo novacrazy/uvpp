@@ -188,7 +188,7 @@ namespace uv {
 
                     Idle *self = static_cast<Idle *>(d->self);
 
-                    static_cast<Cont *>(d->continuation.get())->f( *self );
+                    static_cast<Cont *>(d->continuation.get())->f( self );
                 } );
             }
 
@@ -218,7 +218,7 @@ namespace uv {
 
                     Prepare *self = static_cast<Prepare *>(d->self);
 
-                    static_cast<Cont *>(d->continuation.get())->f( *self );
+                    static_cast<Cont *>(d->continuation.get())->f( self );
                 } );
             }
 
@@ -248,7 +248,7 @@ namespace uv {
 
                     Check *self = static_cast<Check *>(d->self);
 
-                    static_cast<Cont *>(d->continuation.get())->f( *self );
+                    static_cast<Cont *>(d->continuation.get())->f( self );
                 } );
             }
 
@@ -287,7 +287,7 @@ namespace uv {
 
                                     Check *self = static_cast<Check *>(d->self);
 
-                                    static_cast<Cont *>(d->continuation.get())->f( *self );
+                                    static_cast<Cont *>(d->continuation.get())->f( self );
                                 },
                     //libuv expects milliseconds, so convert any duration given to milliseconds
                                 std::chrono::duration_cast<millis>( timeout ).count(),
@@ -300,53 +300,73 @@ namespace uv {
             }
     };
 
-    template <typename P = void, typename R = void>
-    class Async final : public Handle<uv_async_t, Async<P, R>> {
+    class Async : public Handle<uv_async_t, Async> {
         public:
-            typedef typename Handle<uv_async_t, Async<P, R>>::handle_t handle_t;
+            typedef typename Handle<uv_async_t, Async>::handle_t handle_t;
 
         protected:
             void _init() {
                 //No-op for uv_async_t
             }
 
+        public:
+            virtual void send_void() {
+
+            }
+    };
+
+    template <typename Functor>
+    class AsyncDetail final : public Async {
+        public:
+            typedef typename Async::handle_t handle_t;
+
+        protected:
             std::mutex m;
 
-        public:
-            template <typename Functor>
-            inline void start( Functor f ) {
-                typedef detail::AsyncContinuation<Functor, P, R> Cont;
+            typedef detail::AsyncContinuation<Functor> Continuation;
 
-                this->internal_data.continuation = std::make_shared<Cont>( f );
+            typedef typename detail::function_traits<Functor>::result_type result_type;
+            typedef typename detail::function_traits<Functor>::tuple_type  tuple_type;
+
+            enum {
+                arity = detail::function_traits<Functor>::arity - 1
+            };
+
+        public:
+            inline void start( Functor f ) {
+                this->internal_data.continuation = std::make_shared<Continuation>( f );
 
                 uv_async_init( this->_loop, this->handle(), []( uv_async_t *h ) {
                     HandleData *d = static_cast<HandleData *>(h->data);
 
-                    auto *self = static_cast<Async<P, R> *>(d->self);
+                    auto *self = static_cast<AsyncDetail<Functor> *>(d->self);
 
                     std::lock_guard<std::mutex> lock( self->m );
 
-                    Cont *c = static_cast<Cont *>(d->continuation.get());
+                    Continuation *c = static_cast<Continuation *>(d->continuation.get());
 
-                    c->dispatch( static_cast<Async<P, R> *>(d->self));
+                    c->dispatch( static_cast<Async *>(self));
                 } );
             }
 
+            /*
+             * The enable_if is to generate slightly more appealing error messages when there are
+             * incorrect number of arguments given. That way it fails here instead of deep into the details.
+             * */
             template <typename... Args>
-            inline std::shared_future<R> send( Args... args ) {
-                typedef detail::AsyncContinuation<void *, P, R> Cont;
-
+            inline typename std::enable_if<sizeof...( Args ) == arity, std::shared_future<result_type>>::type
+            send( Args... args ) {
                 std::lock_guard<std::mutex> lock( this->m );
 
                 if( this->closing ) {
-                    return std::async( std::launch::deferred, []() -> R {
+                    return std::async( std::launch::deferred, []() -> result_type {
                         throw ::uv::Exception( "async handle closed" );
                     } ).share();
 
                 } else {
-                    Cont *c = static_cast<Cont *>(this->internal_data.continuation.get());
+                    Continuation *c = static_cast<Continuation *>(this->internal_data.continuation.get());
 
-                    auto ret = c->init( std::forward<Args>( args )... );
+                    auto ret = c->init( static_cast<Async *>(this), std::forward<Args>( args )... );
 
                     uv_async_send( this->handle());
 
@@ -355,10 +375,20 @@ namespace uv {
             }
 
             template <typename... Args>
-            inline std::future<R> send_defer( Args... args ) {
-                return std::async( std::launch::deferred, [this]( Args... inner_args ) {
+            inline typename std::enable_if<sizeof...( Args ) == arity, std::future<result_type>>::type
+            defer_send( Args... args ) {
+                return std::async( std::launch::deferred, [this]( Args &&... inner_args ) {
                     return this->send( std::forward<Args>( inner_args )... ).get();
                 }, std::forward<Args>( args )... );
+            };
+
+            /*
+             * This only exists when there are no arguments to send, so it can be called from Async* directly
+             * */
+            template <typename U = Functor,
+                      typename = typename std::enable_if<detail::function_traits<U>::arity == 1>::type>
+            inline void send_void() {
+                this->send();
             }
     };
 
@@ -383,7 +413,7 @@ namespace uv {
 
                     Signal *self = static_cast<Signal *>(d->self);
 
-                    static_cast<Cont *>(d->continuation.get())->f( *self, sn );
+                    static_cast<Cont *>(d->continuation.get())->f( self, sn );
                 }, signum );
             }
 

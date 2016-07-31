@@ -6,6 +6,7 @@
 #define UV_TYPE_TRAITS_DETAIL_HPP
 
 #include <type_traits>
+#include "function_traits.hpp"
 
 namespace uv {
     namespace detail {
@@ -20,11 +21,6 @@ namespace uv {
         struct all_type<K, T, Rest...>
             : std::integral_constant<bool, std::is_convertible<T, K>::value && all_type<K, Rest...>::value> {
         };
-
-        template <typename Functor, typename... Args>
-        using result_of = typename std::result_of<typename std::decay<Functor>::type(
-            typename std::decay<Args>::type... )>::type;
-
     }
 }
 

@@ -5,6 +5,8 @@
 #ifndef UV_UTILS_DETAIL_HPP
 #define UV_UTILS_DETAIL_HPP
 
+#include <tuple>
+
 namespace uv {
     namespace detail {
         /*
@@ -45,6 +47,20 @@ namespace uv {
             first_type  first;
             second_type second;
         };
+
+        template <typename Functor, typename T, std::size_t... S>
+        inline decltype( auto ) invoke_helper( Functor &&func, T &&t, std::index_sequence<S...> ) {
+            return func( std::get<S>( std::forward<T>( t ))... );
+        }
+
+        template <typename Functor, typename T>
+        inline decltype( auto ) invoke( Functor &&func, T &&t ) {
+            constexpr auto Size = std::tuple_size<typename std::decay<T>::type>::value;
+
+            return invoke_helper( std::forward<Functor>( func ),
+                                  std::forward<T>( t ),
+                                  std::make_index_sequence<Size>{} );
+        }
     }
 }
 
