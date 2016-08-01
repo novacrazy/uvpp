@@ -121,7 +121,7 @@ namespace uv {
             }
 
             inline void stop() {
-                this->close( []() {} );
+                this->close( [] {} );
             }
 
             template <typename Functor>

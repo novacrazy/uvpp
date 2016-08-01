@@ -83,7 +83,7 @@ namespace uv {
                     uv_loop_init( this->handle());
                 }
 
-                this->schedule_async = this->async( [this]() -> void {
+                this->schedule_async = this->async( [this] {
 #ifdef UV_USE_BOOST_LOCKFREE
                     this->task_queue.consume_all( [this]( scheduled_task &task ) {
                         task.second( task.first );
@@ -514,7 +514,7 @@ namespace uv {
 
         if( expect_closing ) {
             //All this does is execute the functor given when future.get() is called. No extra threads for deferred
-            return std::async( std::launch::deferred, []() {
+            return std::async( std::launch::deferred, [] {
                 throw ::uv::Exception( "handle already closing or closed" );
             } );
 
@@ -527,7 +527,7 @@ namespace uv {
 
             auto ret = c->init( this );
 
-            this->loop()->schedule( [this, f]() {
+            this->loop()->schedule( [this, f] {
                 uv_close((uv_handle_t *)this->handle(), []( uv_handle_t *h ) {
                     HandleData *d = static_cast<HandleData *>(h->data);
 
