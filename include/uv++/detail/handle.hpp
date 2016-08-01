@@ -23,7 +23,7 @@
 namespace uv {
     namespace detail {
         template <typename Functor, typename Self>
-        using ContinuationNeedsSelf = first_arg_is<Functor, Self *>;
+        using ContinuationNeedsSelf = first_arg_is<Functor, typename std::add_pointer<Self>::type>;
 
         template <typename Functor, typename Self, bool needs_self = ContinuationNeedsSelf<Functor, Self>::value>
         struct Continuation : public std::enable_shared_from_this<Continuation<Functor, Self, needs_self>> {
