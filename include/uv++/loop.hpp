@@ -27,6 +27,10 @@
 
 #include <boost/lockfree/queue.hpp>
 
+#ifndef UV_LOCKFREE_QUEUE_SIZE
+#define UV_LOCKFREE_QUEUE_SIZE 128
+#endif
+
 #else
 
 #include <mutex>
@@ -58,22 +62,19 @@ namespace uv {
 
             std::atomic_bool stopped;
 
-            typedef std::unordered_set<std::shared_ptr<void>>                       handle_set_type;
-            handle_set_type                                                         handle_set;
-            std::mutex                                                              handle_set_mutex;
+            typedef std::unordered_set<std::shared_ptr<void>>         handle_set_type;
+            handle_set_type                                           handle_set;
+            std::mutex                                                handle_set_mutex;
 
-            typedef detail::TrivialPair<uv_handle_t *, void ( * )( uv_handle_t * )> close_args;
+            typedef detail::TrivialPair<void *, void ( * )( void * )> scheduled_task;
 
 #ifdef UV_USE_BOOST_LOCKFREE
-            boost::lockfree::queue<close_args> close_queue;
+            boost::lockfree::queue<scheduled_task> task_queue;
 #else
-            std::deque<close_args>   close_queue;
-            std::mutex               close_mutex;
+            std::deque<scheduled_task> task_queue;
+            std::mutex                 schedule_mutex;
 #endif
-
-            //typedef decltype( [this]( Async &a ) -> void {} ) close_async_functor;
-
-            std::shared_ptr<Async> close_async;
+            std::shared_ptr<Async> schedule_async;
             std::thread::id        loop_thread;
 
         protected:
@@ -82,19 +83,19 @@ namespace uv {
                     uv_loop_init( this->handle());
                 }
 
-                this->close_async = this->async( [this]() -> void {
+                this->schedule_async = this->async( [this]() -> void {
 #ifdef UV_USE_BOOST_LOCKFREE
-                    this->close_queue.consume_all( []( close_args &c ) {
-                        uv_close( c.first, c.second );
+                    this->task_queue.consume_all( [this]( scheduled_task &task ) {
+                        task.second( task.first );
                     } );
 #else
-                    std::lock_guard<std::mutex> lock( this->close_mutex );
+                    std::lock_guard<std::mutex> lock( this->schedule_mutex );
 
-                    for( close_args &c : this->close_queue ) {
-                        uv_close( c.first, c.second );
+                    for( scheduled_task &task : this->task_queue ) {
+                        task.second( task.first );
                     }
 
-                    this->close_queue.clear();
+                    this->task_queue.clear();
 #endif
                     this->update_time();
                 } );
@@ -120,7 +121,7 @@ namespace uv {
             inline Loop()
                 : _fs( this ), external( false )
 #ifdef UV_USE_BOOST_LOCKFREE
-                , close_queue( 128 )
+                , task_queue( UV_LOCKFREE_QUEUE_SIZE )
 #endif
             {
                 this->init( this, new handle_t );
@@ -129,7 +130,7 @@ namespace uv {
             explicit inline Loop( handle_t *l )
                 : _fs( this ), external( true )
 #ifdef UV_USE_BOOST_LOCKFREE
-                , close_queue( 128 )
+                , task_queue( UV_LOCKFREE_QUEUE_SIZE )
 #endif
             {
                 this->init( this, l );
@@ -220,7 +221,7 @@ namespace uv {
                 return uv_loop_size();
             }
 
-            inline int backend_fs() const {
+            inline int backend_fd() const {
                 return uv_backend_fd( handle());
             }
 
@@ -365,6 +366,41 @@ namespace uv {
                 return new_handle<Signal>( std::forward<Args>( args )... );
             }
 
+            template <typename Functor, typename... Args>
+            inline std::shared_future<void> schedule( Functor f, Args... args ) {
+                typedef detail::AsyncContinuation<Functor, Loop> Cont;
+
+                Cont *c = new Cont( f );
+
+                auto ret = c->init( this, std::forward<Args>( args )... );
+
+                scheduled_task t{ c, []( void *vc ) {
+                    Cont *sc = static_cast<Cont *>(vc);
+
+                    sc->dispatch();
+
+                    sc->cleanup();
+
+                    delete sc;
+                }};
+
+#ifdef UV_USE_BOOST_LOCKFREE
+                this->task_queue.push( t );
+#else
+                {
+                    //Only lock the duration of the push_back
+                    std::lock_guard<std::mutex> lock( this->schedule_mutex );
+
+                    this->task_queue.push_back( t );
+                }
+#endif
+                auto r = this->schedule_async->send_void();
+
+                assert( r.valid());
+
+                return ret;
+            }
+
             /*
              * This is such a mess, but that's what I get for mixing C and C++
              *
@@ -465,9 +501,7 @@ namespace uv {
 
     template <typename H, typename D>
     template <typename Functor>
-    std::future<void> Handle<H, D>::close( Functor f ) {
-        typedef detail::CloseHelperContinuation<Functor, D> Cont;
-
+    std::shared_future<void> Handle<H, D>::close( Functor f ) {
         /*
          * Using the atomic compare and exchange code below, this can atomically test whether closing is true, and if it
          * isn't, then set it to true for the upcoming close. It also ensures expect_closing is equal to closing before
@@ -485,54 +519,29 @@ namespace uv {
             } );
 
         } else {
-            //Will need c later to get the future
+            typedef detail::AsyncContinuation<Functor, D> Cont;
+
             auto c = std::make_shared<Cont>( f );
 
             this->internal_data.close_continuation = c;
 
-            auto queue_data = Loop::close_args{ (uv_handle_t *)( this->handle()), []( uv_handle_t *h ) {
-                HandleData *d = static_cast<HandleData *>(h->data);
+            auto ret = c->init( this );
 
-                auto *self = static_cast<typename Handle<H, D>::derived_type *>(d->self);
+            this->loop()->schedule( [this, f]() {
+                uv_close((uv_handle_t *)this->handle(), []( uv_handle_t *h ) {
+                    HandleData *d = static_cast<HandleData *>(h->data);
 
-                Cont *sc = static_cast<Cont *>(d->close_continuation.get());
+                    auto sc = std::static_pointer_cast<Cont>( d->close_continuation );
 
-                try {
-                    sc->dispatch( self );
+                    sc->dispatch();
 
-                    sc->result.set_value();
+                    sc->cleanup();
 
-                } catch( ... ) {
-                    sc->result.set_exception( std::current_exception());
-                }
+                    d->close_continuation.reset();
+                } );
+            } );
 
-                //It's fine to reset the close_continuation (and delete the promise) since it's already been resolved above
-                d->close_continuation.reset();
-            }};
-
-            if( std::this_thread::get_id() == this->loop()->loop_thread ) {
-                /*
-                 * If we're on the same thread as the event loop, we can call uv_close here with no issues
-                 * */
-
-                uv_close( queue_data.first, queue_data.second );
-
-            } else {
-#ifdef UV_USE_BOOST_LOCKFREE
-                this->loop()->close_queue.push( queue_data );
-#else
-                //Only lock the duration of the push_back
-                std::lock_guard<std::mutex> lock( this->loop()->close_mutex );
-
-                this->loop()->close_queue.push_back( queue_data );
-#endif
-            }
-
-            auto r = this->loop()->close_async->send_void();
-
-            assert( r.valid());
-
-            return c->result.get_future();
+            return ret;
         }
     }
 
