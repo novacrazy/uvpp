@@ -111,13 +111,13 @@ namespace uv {
             typedef const volatile C &owner_type;
         };
 
+#undef MEM_FN_SYMBOL
+#endif
+
         template <typename Functor>
         struct function_traits<std::function<Functor>>
             : public function_traits<Functor> {
         };
-
-#undef MEM_FN_SYMBOL_XX0SL7G4Z0J
-#endif
 
         template <typename T>
         struct function_traits<T &> : public function_traits<T> {
@@ -155,7 +155,7 @@ namespace uv {
         struct first_arg_is {
             typedef typename function_traits<Functor>::template arg<0>::type first_arg;
 
-            static constexpr bool value = std::is_convertible<T, first_arg>::value;
+            static constexpr bool value = std::is_same<first_arg, T>::value;
         };
 
         template <typename Functor, typename T>
