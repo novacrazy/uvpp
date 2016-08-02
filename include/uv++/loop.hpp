@@ -13,6 +13,7 @@
 #include "detail/utils.hpp"
 
 #include "handle.hpp"
+#include "request.hpp"
 #include "fs.hpp"
 
 #include <thread>
@@ -119,7 +120,7 @@ namespace uv {
             }
 
             inline Loop()
-                : _fs( this ), external( false )
+                : _fs( this ), external( false ), loop_thread( std::this_thread::get_id())
 #ifdef UV_USE_BOOST_LOCKFREE
                 , task_queue( UV_LOCKFREE_QUEUE_SIZE )
 #endif
@@ -128,7 +129,7 @@ namespace uv {
             }
 
             explicit inline Loop( handle_t *l )
-                : _fs( this ), external( true )
+                : _fs( this ), external( true ), loop_thread( std::this_thread::get_id())
 #ifdef UV_USE_BOOST_LOCKFREE
                 , task_queue( UV_LOCKFREE_QUEUE_SIZE )
 #endif
@@ -269,6 +270,10 @@ namespace uv {
         protected:
             template <typename H, typename... Args>
             inline std::shared_ptr<H> new_handle( Args &&... args ) {
+                if( std::this_thread::get_id() != this->loop_thread ) {
+                    throw ::uv::Exception( "cannot create new handles outside of event loop thread" );
+                }
+
                 std::lock_guard<std::mutex> lock( this->handle_set_mutex );
 
                 std::shared_ptr<H> p = std::make_shared<H>();
@@ -367,7 +372,7 @@ namespace uv {
             }
 
             template <typename Functor, typename... Args>
-            inline std::shared_future<void> schedule( Functor f, Args... args ) {
+            decltype( auto ) schedule( Functor f, Args... args ) {
                 typedef detail::AsyncContinuation<Functor, Loop> Cont;
 
                 Cont *c = new Cont( f );
@@ -502,6 +507,8 @@ namespace uv {
     template <typename H, typename D>
     template <typename Functor>
     std::shared_future<void> Handle<H, D>::close( Functor f ) {
+        typedef detail::AsyncContinuation<Functor, D> Cont;
+
         /*
          * Using the atomic compare and exchange code below, this can atomically test whether closing is true, and if it
          * isn't, then set it to true for the upcoming close. It also ensures expect_closing is equal to closing before
@@ -519,27 +526,33 @@ namespace uv {
             } );
 
         } else {
-            typedef detail::AsyncContinuation<Functor, D> Cont;
-
             auto c = std::make_shared<Cont>( f );
 
             this->internal_data.close_continuation = c;
 
             auto ret = c->init( this );
 
-            this->loop()->schedule( [this, f] {
-                uv_close((uv_handle_t *)this->handle(), []( uv_handle_t *h ) {
-                    HandleData *d = static_cast<HandleData *>(h->data);
+            auto cb = []( uv_handle_t *h ) {
+                HandleData *d = static_cast<HandleData *>(h->data);
 
-                    auto sc = std::static_pointer_cast<Cont>( d->close_continuation );
+                auto sc = std::static_pointer_cast<Cont>( d->close_continuation );
 
-                    sc->dispatch();
+                sc->dispatch();
 
-                    sc->cleanup();
+                sc->cleanup();
 
-                    d->close_continuation.reset();
+                d->close_continuation.reset();
+            };
+
+            if( std::this_thread::get_id() != this->loop()->loop_thread ) {
+
+                this->loop()->schedule( [this, cb] {
+                    uv_close((uv_handle_t *)this->handle(), cb );
                 } );
-            } );
+
+            } else {
+                uv_close((uv_handle_t *)this->handle(), cb );
+            }
 
             return ret;
         }
