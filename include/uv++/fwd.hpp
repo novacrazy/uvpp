@@ -38,6 +38,11 @@ namespace uv {
     class Filesystem;
 
     class File;
+
+    template <typename, typename>
+    class Request;
+
+    class Work;
 }
 
 #endif //UV_FWD_HPP
