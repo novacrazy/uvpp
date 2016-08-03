@@ -6,6 +6,7 @@
 #define UV_UTILS_DETAIL_HPP
 
 #include <tuple>
+#include <future>
 
 namespace uv {
     namespace detail {
@@ -61,6 +62,20 @@ namespace uv {
                                   std::forward<T>( t ),
                                   std::make_index_sequence<Size>{} );
         }
+
+        template <typename T>
+        inline std::future<T> make_ready_future( T &&t ) {
+            std::promise<T> p;
+            p.set_value( t );
+            return p.get_future();
+        }
+
+        template <typename T, typename E>
+        inline std::future<T> make_exception_future( E e ) {
+            std::promise<T> p;
+            p.set_exception( std::make_exception_ptr( e ));
+            return p.get_future();
+        };
     }
 }
 
