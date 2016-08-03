@@ -403,8 +403,6 @@ namespace uv {
 
                     sc->dispatch();
 
-                    sc->cleanup();
-
                     delete sc;
                 }};
 
@@ -512,6 +510,20 @@ namespace uv {
         this->init( l, l->handle());
     }
 
+    template <typename H, typename D>
+    inline void Request<H, D>::init( Loop *l ) {
+        assert( l != nullptr );
+
+        this->init( l, l->handle());
+    }
+
+    //TODO: Replace this with something similar to the above init functions
+    void Filesystem::init( Loop *l ) {
+        assert( l != nullptr );
+
+        this->_loop = l->handle();
+    }
+
     namespace detail {
         template <typename Functor, typename Self>
         struct CloseHelperContinuation : public Continuation<Functor, Self> {
@@ -565,8 +577,6 @@ namespace uv {
 
                 sc->dispatch();
 
-                sc->cleanup();
-
                 d->close_continuation.reset();
             };
 
@@ -581,12 +591,6 @@ namespace uv {
 
             return ret;
         }
-    }
-
-    void Filesystem::init( Loop *l ) {
-        assert( l != nullptr );
-
-        this->_loop = l->handle();
     }
 }
 

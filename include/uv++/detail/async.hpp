@@ -80,6 +80,22 @@ namespace uv {
 
             inline void dispatch() {
                 dispatch_helper<result_type>::dispatch( *this->r, this->f, std::move( *this->p ));
+
+                this->cleanup();
+            }
+
+            template <typename E>
+            inline void set_exception( E e ) {
+                this->r->set_exception( std::make_exception_ptr( e ));
+
+                this->cleanup();
+            }
+
+            template <typename T>
+            inline void set_value( T t ) {
+                this->r->set_value( t );
+
+                this->cleanup();
             }
 
             inline void cleanup() {
@@ -122,6 +138,22 @@ namespace uv {
 
             inline void dispatch() {
                 dispatch_helper<result_type>::dispatch( *this->r, this->f, tuple_type());
+
+                this->cleanup();
+            }
+
+            template <typename E>
+            inline void set_exception( E e ) {
+                this->r->set_exception( std::make_exception_ptr( e ));
+
+                this->cleanup();
+            }
+
+            template <typename T>
+            inline void set_value( T t ) {
+                this->r->set_value( t );
+
+                this->cleanup();
             }
 
             inline void cleanup() {

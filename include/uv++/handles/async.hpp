@@ -81,14 +81,11 @@ namespace uv {
                     Continuation *c = static_cast<Continuation *>(d->continuation.get());
 
                     if( self->closing ) {
-                        c->r->set_exception(
-                            std::make_exception_ptr( ::uv::Exception( "async handle has been closed" )));
+                        c->set_exception( ::uv::Exception( "async handle has been closed" ));
 
                     } else {
                         c->dispatch();
                     }
-
-                    c->cleanup();
 
                     self->is_sending = false;
                 } );
@@ -119,6 +116,14 @@ namespace uv {
 
                     auto ret = c->init( static_cast<Async *>(this), std::forward<Args>( args )... );
 
+                    /*
+                     * So even with the mutex and stuff above, there is a slight chance libuv will still occasionally
+                     * try to run the async task twice if you queue it up many times really fast.
+                     *
+                     * I'm guessing it marks the task as "done" before it runs the callback, so in the time between
+                     * the callback starting and it finishing, queueing up another uv_async_send could potentially
+                     * cause it to run again. So just keep track of it with our own flag so it doesn't confuse it.
+                     * */
                     if( !expect_sending ) {
                         uv_async_send( this->handle());
                     }

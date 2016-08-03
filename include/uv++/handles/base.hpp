@@ -51,7 +51,7 @@ namespace uv {
             virtual void _stop() = 0;
 
             //Can be called in subclasses
-            inline void init( Loop *p, uv_loop_t *l ) {
+            void init( Loop *p, uv_loop_t *l ) {
                 assert( p != nullptr );
                 assert( l != nullptr );
 
