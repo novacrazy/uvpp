@@ -76,6 +76,65 @@ namespace uv {
             p.set_exception( std::make_exception_ptr( e ));
             return p.get_future();
         };
+
+        template <typename T, bool = std::is_fundamental<T>::value>
+        struct LazyStatic {
+            typedef T value_type;
+
+            value_type       *value;
+            std::atomic_bool ran;
+
+            virtual void init() = 0;
+
+            inline operator value_type &() {
+                return this->get();
+            }
+
+            inline value_type &get() {
+                bool expect_ran = false;
+
+                ran.compare_exchange_strong( expect_ran, true );
+
+                if( !expect_ran ) {
+                    this->init();
+                }
+
+                return *value;
+            }
+
+            ~LazyStatic() {
+                delete this->value;
+            }
+        };
+
+        /*
+         * Specialization for fundemental type that don't require heap allocations
+         * */
+        template <typename T>
+        struct LazyStatic<T, true> {
+            typedef T value_type;
+
+            value_type       value;
+            std::atomic_bool ran;
+
+            virtual void init() = 0;
+
+            inline operator value_type &() {
+                return this->get();
+            }
+
+            inline value_type &get() {
+                bool expect_ran = false;
+
+                ran.compare_exchange_strong( expect_ran, true );
+
+                if( !expect_ran ) {
+                    this->init();
+                }
+
+                return value;
+            }
+        };
     }
 }
 
