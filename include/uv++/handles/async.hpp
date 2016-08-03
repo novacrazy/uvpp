@@ -33,8 +33,12 @@ namespace uv {
             typedef typename Handle<uv_async_t, Async>::handle_t handle_t;
 
         protected:
-            void _init() {
+            inline void _init() {
                 //No-op for uv_async_t
+            }
+
+            inline void _stop() {
+                //Also a no-op for uv_async_t
             }
 
         public:
@@ -65,6 +69,8 @@ namespace uv {
             inline void start( Functor f ) {
                 this->internal_data.continuation = std::make_shared<Continuation>( f );
 
+                this->is_sending = false;
+
                 uv_async_init( this->_loop, this->handle(), []( uv_async_t *h ) {
                     HandleData *d = static_cast<HandleData *>(h->data);
 
@@ -93,7 +99,7 @@ namespace uv {
              * incorrect number of arguments given. That way it fails here instead of deep into the details.
              * */
             template <typename... Args>
-            inline typename std::enable_if<sizeof...( Args ) == arity, std::shared_future<result_type>>::type
+            typename std::enable_if<sizeof...( Args ) == arity, std::shared_future<result_type>>::type
             send( Args... args ) {
                 /*
                  * The mutex is here because by the time it acquires the lock there is a low chance the Async handle
@@ -102,9 +108,7 @@ namespace uv {
                 std::lock_guard<std::mutex> lock( this->m );
 
                 if( this->closing ) {
-                    return std::async( std::launch::deferred, []() -> result_type {
-                        throw ::uv::Exception( "async handle closed" );
-                    } ).share();
+                    throw ::uv::Exception( "async handle closed" );
 
                 } else {
                     bool expect_sending = false;
@@ -135,7 +139,7 @@ namespace uv {
              * This only exists when there are no arguments to send, so it can be called from Async* directly
              * */
 
-            std::shared_future<void> send_void() override {
+            inline std::shared_future<void> send_void() override {
                 return detail::send_void_helper<result_type, arity>::send_void( this );
             }
     };

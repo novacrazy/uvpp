@@ -82,7 +82,7 @@ namespace uv {
                 dispatch_helper<result_type>::dispatch( *this->r, this->f, std::move( *this->p ));
             }
 
-            void cleanup() {
+            inline void cleanup() {
                 this->r.reset();
                 this->s.reset();
                 this->p.reset();
@@ -124,7 +124,7 @@ namespace uv {
                 dispatch_helper<result_type>::dispatch( *this->r, this->f, tuple_type());
             }
 
-            void cleanup() {
+            inline void cleanup() {
                 this->r.reset();
                 this->s.reset();
             }

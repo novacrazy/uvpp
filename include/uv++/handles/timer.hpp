@@ -17,6 +17,10 @@ namespace uv {
                 uv_timer_init( this->_loop, &_handle );
             }
 
+            inline void _stop() {
+                uv_timer_stop( &_handle );
+            }
+
         public:
             template <typename Functor,
                       typename _Rep, typename _Period,
@@ -44,10 +48,6 @@ namespace uv {
                                 std::chrono::duration_cast<millis>( timeout ).count(),
                                 std::chrono::duration_cast<millis>( repeat ).count()
                 );
-            }
-
-            inline void stop() {
-                uv_timer_stop( &_handle );
             }
     };
 }

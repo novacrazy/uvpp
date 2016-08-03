@@ -17,6 +17,10 @@ namespace uv {
                 uv_idle_init( this->_loop, &_handle );
             }
 
+            inline void _stop() {
+                uv_idle_stop( &_handle );
+            }
+
         public:
             template <typename Functor>
             inline void start( Functor f ) {
@@ -31,10 +35,6 @@ namespace uv {
 
                     static_cast<Cont *>(d->continuation.get())->dispatch( self );
                 } );
-            }
-
-            inline void stop() {
-                uv_idle_stop( &_handle );
             }
     };
 }

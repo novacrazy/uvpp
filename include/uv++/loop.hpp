@@ -85,21 +85,31 @@ namespace uv {
                 }
 
                 this->schedule_async = this->async( [this] {
+                    assert( std::this_thread::get_id() == this->loop_thread );
+
 #ifdef UV_USE_BOOST_LOCKFREE
                     this->task_queue.consume_all( [this]( scheduled_task &task ) {
                         task.second( task.first );
                     } );
 #else
-                    std::lock_guard<std::mutex> lock( this->schedule_mutex );
+                    {
+                        std::lock_guard<std::mutex> lock( this->schedule_mutex );
 
-                    for( scheduled_task &task : this->task_queue ) {
-                        task.second( task.first );
+                        for( scheduled_task &task : this->task_queue ) {
+                            task.second( task.first );
+                        }
+
+                        this->task_queue.clear();
                     }
-
-                    this->task_queue.clear();
 #endif
                     this->update_time();
                 } );
+            }
+
+            inline void _stop() {
+                stopped = true;
+
+                uv_stop( handle());
             }
 
         public:
@@ -122,7 +132,7 @@ namespace uv {
             inline Loop()
                 : _fs( this ), external( false ), loop_thread( std::this_thread::get_id())
 #ifdef UV_USE_BOOST_LOCKFREE
-                , task_queue( UV_LOCKFREE_QUEUE_SIZE )
+            , task_queue( UV_LOCKFREE_QUEUE_SIZE )
 #endif
             {
                 this->init( this, new handle_t );
@@ -131,7 +141,7 @@ namespace uv {
             explicit inline Loop( handle_t *l )
                 : _fs( this ), external( true ), loop_thread( std::this_thread::get_id())
 #ifdef UV_USE_BOOST_LOCKFREE
-                , task_queue( UV_LOCKFREE_QUEUE_SIZE )
+            , task_queue( UV_LOCKFREE_QUEUE_SIZE )
 #endif
             {
                 this->init( this, l );
@@ -150,7 +160,7 @@ namespace uv {
             }
 
             template <typename _Rep, typename _Period>
-            inline void run_forever( const std::chrono::duration<_Rep, _Period> &delay, run_mode mode = RUN_DEFAULT ) {
+            void run_forever( const std::chrono::duration<_Rep, _Period> &delay, run_mode mode = RUN_DEFAULT ) {
                 this->stopped = false;
 
 #ifdef UV_DETRACT_LOOP
@@ -183,7 +193,7 @@ namespace uv {
                 }
 #else
                 while( !this->stopped ) {
-                    if( !this->run( mode ) || mode == RUN_NOWAIT ) {
+                    if( this->run( mode ) == 0 || mode == RUN_NOWAIT ) {
                         std::this_thread::sleep_for( delay );
                     }
                 }
@@ -200,15 +210,15 @@ namespace uv {
                 this->run_forever( mode );
             }
 
-            inline void stop() {
-                stopped = true;
-
-                uv_stop( handle());
+            inline std::thread::id thread_id() const {
+                return this->loop_thread;
             }
 
             template <typename... Args>
             typename std::enable_if<detail::all_type<uv_loop_option, Args...>::value, Loop &>::type
-            inline configure( Args &&... args ) {
+            configure( Args &&... args ) {
+                assert( std::this_thread::get_id() == this->loop_thread );
+
                 auto res = uv_loop_configure( handle(), std::forward<Args>( args )... );
 
                 if( res != 0 ) {
@@ -223,10 +233,14 @@ namespace uv {
             }
 
             inline int backend_fd() const {
+                assert( std::this_thread::get_id() == this->loop_thread );
+
                 return uv_backend_fd( handle());
             }
 
             inline int backend_timeout() const {
+                assert( std::this_thread::get_id() == this->loop_thread );
+
                 return uv_backend_timeout( handle());
             }
 
@@ -240,6 +254,8 @@ namespace uv {
 
             //returns true on closed
             inline bool try_close( int *resptr = nullptr ) {
+                assert( std::this_thread::get_id() == this->loop_thread );
+
                 int res = uv_loop_close( handle());
 
                 if( resptr != nullptr ) {
@@ -269,10 +285,8 @@ namespace uv {
 
         protected:
             template <typename H, typename... Args>
-            inline std::shared_ptr<H> new_handle( Args &&... args ) {
-                if( std::this_thread::get_id() != this->loop_thread ) {
-                    throw ::uv::Exception( "cannot create new handles outside of event loop thread" );
-                }
+            std::shared_ptr<H> new_handle( Args &&... args ) {
+                assert( std::this_thread::get_id() == this->loop_thread );
 
                 std::lock_guard<std::mutex> lock( this->handle_set_mutex );
 
@@ -361,6 +375,11 @@ namespace uv {
                 return new_handle<Timer>( f, timeout, repeat );
             }
 
+            template <typename... Args>
+            inline std::shared_ptr<Timer> timeout( Args... args ) {
+                return this->timer( std::forward<Args>( args )... );
+            }
+
             template <typename Functor>
             inline std::shared_ptr<AsyncDetail<Functor>> async( Functor f ) {
                 return new_handle<AsyncDetail<Functor>>( f );
@@ -399,9 +418,7 @@ namespace uv {
                     this->task_queue.push_back( t );
                 }
 #endif
-                auto r = this->schedule_async->send_void();
-
-                assert( r.valid());
+                this->schedule_async->send_void();
 
                 return ret;
             }
@@ -414,6 +431,8 @@ namespace uv {
             template <typename _Char = char>
             void print_handles( std::basic_ostream<_Char> &out, bool only_active = false ) const {
                 typedef void *UV_QUEUE[2];
+
+                assert( std::this_thread::get_id() == this->loop_thread );
 #ifndef _WIN32
                 enum {
                   UV__HANDLE_INTERNAL = 0x8000,
@@ -476,7 +495,7 @@ namespace uv {
         static std::shared_ptr<::uv::Loop> default_loop_ptr;
     }
 
-    std::shared_ptr<Loop> default_loop() {
+    inline std::shared_ptr<Loop> default_loop() {
         using namespace ::uv::detail;
 
         if( !default_loop_ptr ) {
@@ -505,6 +524,16 @@ namespace uv {
     }
 
     template <typename H, typename D>
+    inline std::thread::id HandleBase<H, D>::loop_thread() {
+        return this->loop()->thread_id();
+    };
+
+    template <typename H, typename D>
+    inline std::thread::id Request<H, D>::loop_thread() {
+        return this->loop()->thread_id();
+    };
+
+    template <typename H, typename D>
     template <typename Functor>
     std::shared_future<void> Handle<H, D>::close( Functor f ) {
         typedef detail::AsyncContinuation<Functor, D> Cont;
@@ -520,10 +549,7 @@ namespace uv {
         this->closing.compare_exchange_strong( expect_closing, true );
 
         if( expect_closing ) {
-            //All this does is execute the functor given when future.get() is called. No extra threads for deferred
-            return std::async( std::launch::deferred, [] {
-                throw ::uv::Exception( "handle already closing or closed" );
-            } );
+            return detail::make_exception_future<void>( ::uv::Exception( "handle already closing or closed" ));
 
         } else {
             auto c = std::make_shared<Cont>( f );
@@ -545,7 +571,6 @@ namespace uv {
             };
 
             if( std::this_thread::get_id() != this->loop()->loop_thread ) {
-
                 this->loop()->schedule( [this, cb] {
                     uv_close((uv_handle_t *)this->handle(), cb );
                 } );
@@ -568,7 +593,7 @@ namespace uv {
 #ifdef UV_OVERLOAD_OSTREAM
 
 template <typename _Char>
-std::basic_ostream<_Char> &operator<<( std::basic_ostream<_Char> &out, const uv::Loop &loop ) {
+inline std::basic_ostream<_Char> &operator<<( std::basic_ostream<_Char> &out, const uv::Loop &loop ) {
     loop.print_handles<_Char>( out, false );
 
     return out;

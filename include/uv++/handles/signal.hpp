@@ -18,6 +18,10 @@ namespace uv {
                 uv_signal_init( this->_loop, &_handle );
             }
 
+            void _stop() {
+                uv_signal_stop( &_handle );
+            }
+
         public:
             template <typename Functor>
             inline void start( int signum, Functor f ) {
@@ -36,10 +40,6 @@ namespace uv {
 
             std::string signame() const {
                 return detail::signame( _handle.signum );
-            }
-
-            inline void stop() {
-                uv_signal_stop( &_handle );
             }
     };
 }

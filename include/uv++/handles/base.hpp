@@ -48,6 +48,8 @@ namespace uv {
             //Implemented in derived classes
             virtual void _init() = 0;
 
+            virtual void _stop() = 0;
+
             //Can be called in subclasses
             inline void init( Loop *p, uv_loop_t *l ) {
                 assert( p != nullptr );
@@ -62,12 +64,18 @@ namespace uv {
             }
 
         public:
-            HandleBase() : internal_data( this ) {}
+            inline HandleBase() : internal_data( this ) {}
 
             //Implemented in Loop.hpp to pass Loop::handle() to this->init(uv_loop_t*)
             inline void init( Loop * );
 
-            virtual void stop() = 0;
+            std::thread::id loop_thread();
+
+            void stop() {
+                assert( std::this_thread::get_id() == this->loop_thread());
+
+                this->_stop();
+            }
 
             virtual void start() {
                 throw new ::uv::Exception( UV_ENOSYS );
@@ -108,7 +116,7 @@ namespace uv {
             }
 
             inline bool is_active() const {
-                return uv_is_active((uv_handle_t *)( this->handle())) != 0;
+                return !this->closing && uv_is_active((uv_handle_t *)( this->handle())) != 0;
             }
 
             inline bool is_closing() const {
@@ -117,15 +125,6 @@ namespace uv {
 
             inline size_t size() {
                 return uv_handle_size( this->handle()->type );
-            }
-
-            inline void stop() {
-                this->close( [] {} );
-            }
-
-            template <typename Functor>
-            inline std::shared_future<void> stop( Functor f ) {
-                return this->close( f );
             }
 
             template <typename Functor>
