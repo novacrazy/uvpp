@@ -10,12 +10,6 @@
 
 namespace uv {
     namespace detail {
-
-        template <typename Functor, typename... Args>
-        using result_of = typename std::result_of<
-            typename std::decay<Functor>::type( typename std::decay<Args>::type... )
-        >::type;
-
         /*
          * This is mostly taken from
          * https://github.com/kennytm/utils/blob/master/traits.hpp
@@ -162,6 +156,9 @@ namespace uv {
         struct first_arg_is<Functor, T, 0> : public std::false_type {
 
         };
+
+        template <typename Functor>
+        using result_of = typename function_traits<Functor>::result_type;
     }
 }
 
