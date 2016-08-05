@@ -140,10 +140,6 @@ namespace uv {
                 }, std::forward<Args>( args )... );
             };
 
-            /*
-             * This only exists when there are no arguments to send, so it can be called from Async* directly
-             * */
-
             inline std::shared_future<void> send_void() override {
                 return detail::send_void_helper<result_type, arity>::send_void( this );
             }

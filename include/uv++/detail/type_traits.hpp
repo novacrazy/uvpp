@@ -6,7 +6,6 @@
 #define UV_TYPE_TRAITS_DETAIL_HPP
 
 #include <type_traits>
-#include "function_traits.hpp"
 
 namespace uv {
     namespace detail {

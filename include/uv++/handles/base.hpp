@@ -5,13 +5,10 @@
 #ifndef UV_BASE_HANDLE_HPP
 #define UV_BASE_HANDLE_HPP
 
-#include "../fwd.hpp"
-
 #include "../detail/data.hpp"
 
 #include "../exception.hpp"
 
-#include "../detail/type_traits.hpp"
 #include "../detail/handle.hpp"
 
 #include <future>

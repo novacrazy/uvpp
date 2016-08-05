@@ -7,8 +7,6 @@
 
 #include "fwd.hpp"
 
-#include "exception.hpp"
-
 namespace uv {
     //I would still recommend the stuff in <chrono> though
     inline uint64_t hrtime() {

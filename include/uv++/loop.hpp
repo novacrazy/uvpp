@@ -5,13 +5,6 @@
 #ifndef UV_LOOP_HPP
 #define UV_LOOP_HPP
 
-#include "fwd.hpp"
-
-#include "exception.hpp"
-
-#include "detail/type_traits.hpp"
-#include "detail/utils.hpp"
-
 #include "handle.hpp"
 #include "request.hpp"
 #include "fs.hpp"
@@ -54,6 +47,14 @@ namespace uv {
                 RUN_DEFAULT = UV_RUN_DEFAULT,
                 RUN_ONCE    = UV_RUN_ONCE,
                 RUN_NOWAIT  = UV_RUN_NOWAIT
+            };
+
+            enum class uv_option : std::underlying_type<uv_loop_option>::type {
+                    BLOCK_SIGNAL = UV_LOOP_BLOCK_SIGNAL
+            };
+
+            enum class uvp_option {
+                    WAIT_ON_CLOSE
             };
 
         private:
@@ -113,14 +114,6 @@ namespace uv {
             }
 
         public:
-            enum class uv_option : std::underlying_type<uv_loop_option>::type {
-                    BLOCK_SIGNAL = UV_LOOP_BLOCK_SIGNAL
-            };
-
-            enum class uvp_option {
-                    WAIT_ON_CLOSE
-            };
-
             inline const handle_t *handle() const {
                 return _loop;
             }
@@ -132,7 +125,7 @@ namespace uv {
             inline Loop()
                 : _fs( this ), external( false ), loop_thread( std::this_thread::get_id())
 #ifdef UV_USE_BOOST_LOCKFREE
-            , task_queue( UV_LOCKFREE_QUEUE_SIZE )
+                , task_queue( UV_LOCKFREE_QUEUE_SIZE )
 #endif
             {
                 this->init( this, new handle_t );
@@ -141,7 +134,7 @@ namespace uv {
             explicit inline Loop( handle_t *l )
                 : _fs( this ), external( true ), loop_thread( std::this_thread::get_id())
 #ifdef UV_USE_BOOST_LOCKFREE
-            , task_queue( UV_LOCKFREE_QUEUE_SIZE )
+                , task_queue( UV_LOCKFREE_QUEUE_SIZE )
 #endif
             {
                 this->init( this, l );
@@ -286,8 +279,6 @@ namespace uv {
         protected:
             template <typename H, typename... Args>
             std::shared_ptr<H> new_handle( Args &&... args ) {
-                assert( std::this_thread::get_id() == this->loop_thread );
-
                 std::lock_guard<std::mutex> lock( this->handle_set_mutex );
 
                 std::shared_ptr<H> p = std::make_shared<H>();
@@ -309,16 +300,22 @@ namespace uv {
         public:
             template <typename... Args>
             inline std::shared_ptr<Idle> idle( Args &&... args ) {
+                assert( std::this_thread::get_id() == this->loop_thread );
+
                 return new_handle<Idle>( std::forward<Args>( args )... );
             }
 
             template <typename... Args>
             inline std::shared_ptr<Prepare> prepare( Args &&... args ) {
+                assert( std::this_thread::get_id() == this->loop_thread );
+
                 return new_handle<Prepare>( std::forward<Args>( args )... );
             }
 
             template <typename... Args>
             inline std::shared_ptr<Check> check( Args &&... args ) {
+                assert( std::this_thread::get_id() == this->loop_thread );
+
                 return new_handle<Check>( std::forward<Args>( args )... );
             }
 
@@ -330,6 +327,21 @@ namespace uv {
                                                  const std::chrono::duration<_Rep2, _Period2> &repeat =
                                                  std::chrono::duration<_Rep2, _Period2>(
                                                      std::chrono::duration_values<_Rep2>::zero())) {
+                assert( std::this_thread::get_id() == this->loop_thread );
+
+                return new_handle<Timer>( f, timeout, repeat );
+            }
+
+            template <typename Functor,
+                      typename _Rep, typename _Period,
+                      typename _Rep2 = uint64_t, typename _Period2 = std::milli>
+            inline std::shared_ptr<Timer> repeat( Functor f,
+                                                  const std::chrono::duration<_Rep, _Period> &repeat,
+                                                  const std::chrono::duration<_Rep2, _Period2> &timeout =
+                                                  std::chrono::duration<_Rep2, _Period2>(
+                                                      std::chrono::duration_values<_Rep2>::zero())) {
+                assert( std::this_thread::get_id() == this->loop_thread );
+
                 return new_handle<Timer>( f, timeout, repeat );
             }
 
@@ -364,15 +376,9 @@ namespace uv {
                 return this->timer( f, timeout, repeat );
             }
 
-            template <typename Functor,
-                      typename _Rep, typename _Period,
-                      typename _Rep2 = uint64_t, typename _Period2 = std::milli>
-            inline std::shared_ptr<Timer> repeat( Functor f,
-                                                  const std::chrono::duration<_Rep, _Period> &repeat,
-                                                  const std::chrono::duration<_Rep2, _Period2> &timeout =
-                                                  std::chrono::duration<_Rep2, _Period2>(
-                                                      std::chrono::duration_values<_Rep2>::zero())) {
-                return new_handle<Timer>( f, timeout, repeat );
+            template <typename... Args>
+            inline std::shared_ptr<Timer> interval( Args... args ) {
+                return this->repeat( std::forward<Args>( args )... );
             }
 
             template <typename... Args>
@@ -382,11 +388,15 @@ namespace uv {
 
             template <typename Functor>
             inline std::shared_ptr<AsyncDetail<Functor>> async( Functor f ) {
+                assert( std::this_thread::get_id() == this->loop_thread );
+
                 return new_handle<AsyncDetail<Functor>>( f );
             }
 
             template <typename... Args>
             inline std::shared_ptr<Signal> signal( Args &&... args ) {
+                assert( std::this_thread::get_id() == this->loop_thread );
+
                 return new_handle<Signal>( std::forward<Args>( args )... );
             }
 
@@ -420,6 +430,10 @@ namespace uv {
 
                 return ret;
             }
+
+            inline std::shared_ptr<Work> work() {
+                return new_handle<Work>();
+            };
 
             /*
              * This is such a mess, but that's what I get for mixing C and C++
@@ -490,17 +504,17 @@ namespace uv {
     };
 
     namespace detail {
-        static std::shared_ptr<::uv::Loop> default_loop_ptr;
+        struct DefaultLoop : LazyStatic<std::shared_ptr<Loop>> {
+            std::shared_ptr<Loop> init() {
+                return std::make_shared<Loop>( uv_default_loop());
+            }
+        };
+
+        static DefaultLoop default_loop;
     }
 
     inline std::shared_ptr<Loop> default_loop() {
-        using namespace ::uv::detail;
-
-        if( !default_loop_ptr ) {
-            default_loop_ptr = std::make_shared<Loop>( uv_default_loop());
-        }
-
-        return default_loop_ptr;
+        return detail::default_loop;
     }
 
     template <typename H, typename D>
@@ -590,6 +604,13 @@ namespace uv {
             }
 
             return ret;
+        }
+    }
+
+    namespace detail {
+        template <typename... Args>
+        inline decltype( auto ) schedule( Loop *l, Args... args ) {
+            return l->schedule( std::forward<Args>( args )... );
         }
     }
 }

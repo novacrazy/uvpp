@@ -6,15 +6,13 @@
 #define UV_ASYNC_DETAIL_HPP
 
 #include "handle.hpp"
-#include "type_traits.hpp"
 #include "utils.hpp"
-
-#include <tuple>
-#include <memory>
-#include <future>
 
 namespace uv {
     namespace detail {
+        template <typename... Args>
+        inline decltype( auto ) schedule( Loop *, Args... );
+
         template <typename R>
         struct dispatch_helper {
             template <typename Functor, typename... Args>
@@ -70,7 +68,7 @@ namespace uv {
             typedef typename AsyncContinuationBase<Functor, Self>::tuple_type  tuple_type;
             typedef typename AsyncContinuationBase<Functor, Self>::result_type result_type;
 
-            typedef ContinuationNeedsSelf <Functor, Self> needs_self;
+            typedef ContinuationNeedsSelf<Functor, Self> needs_self;
 
             inline AsyncContinuation( Functor f )
                 : AsyncContinuationBase<Functor, Self>( f ) {
@@ -130,7 +128,7 @@ namespace uv {
             typedef typename AsyncContinuationBase<Functor, Self>::tuple_type  tuple_type;
             typedef typename AsyncContinuationBase<Functor, Self>::result_type result_type;
 
-            typedef ContinuationNeedsSelf <Functor, Self> needs_self;
+            typedef ContinuationNeedsSelf<Functor, Self> needs_self;
 
             inline AsyncContinuation( Functor f )
                 : AsyncContinuationBase<Functor, Self>( f ) {

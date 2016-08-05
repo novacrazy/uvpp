@@ -5,7 +5,7 @@
 #ifndef UV_DATA_DETAIL_HPP
 #define UV_DATA_DETAIL_HPP
 
-#include "uv++/fwd.hpp"
+#include "../fwd.hpp"
 
 #include <memory>
 #include <type_traits>
