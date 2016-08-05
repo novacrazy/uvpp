@@ -21,7 +21,7 @@ The github name is uvpp because github didn't like uv++ as the repository name. 
     - Ability to close handles from any thread
         - Uses an internal Async handle and queue to invoke `uv_close` on the loop thread.
     
-* Hierarchical handle classes
+* Hierarchical Handle classes
     - Base handle functions
     - Idle, Prepare and Check handles
     - Async handles
@@ -31,6 +31,12 @@ The github name is uvpp because github didn't like uv++ as the repository name. 
         - Fully type safe, even with variadic parameters.
     - Signal handles
     - Automatically deduces whether or not the callback requires a pointer to the originating handle
+    
+* Hierarchical Request classes
+    - Base request functions
+    - Work requests for the libuv thread-pool
+        - Totally thread safe, you can queue up work from any thread
+        - Supports bidirectional communication similar to Async handles, but the arguments are given at queue time.
     
 * Misc OS and Net functions
 
@@ -43,9 +49,6 @@ The github name is uvpp because github didn't like uv++ as the repository name. 
 * Basically all Request and Stream components
     - File I/O, DNS, TCP and UDP stuff
 
-* Thread-pool coordination utilities
-    - Still working out the best way to do those
-    
 * Polling handles
     
 ### Will not implement wrappers for:
