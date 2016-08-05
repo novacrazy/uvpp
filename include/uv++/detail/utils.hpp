@@ -70,6 +70,12 @@ namespace uv {
             return p.get_future();
         }
 
+        inline std::future<void> make_ready_future( void ) {
+            std::promise<void> p;
+            p.set_value();
+            return p.get_future();
+        }
+
         template <typename T, typename E>
         inline std::future<T> make_exception_future( E e ) {
             std::promise<T> p;
@@ -77,64 +83,58 @@ namespace uv {
             return p.get_future();
         };
 
-        template <typename T, bool = std::is_fundamental<T>::value>
+        template <typename T>
         struct LazyStatic {
             typedef T value_type;
 
-            value_type       *value;
-            std::atomic_bool ran;
+            virtual value_type init() = 0;
 
-            virtual void init() = 0;
+            value_type               value;
+            std::once_flag           once;
+            std::atomic_bool         ran;
+            std::promise<void>       p;
+            std::shared_future<void> s;
+
+            LazyStatic()
+                : p(), s( p.get_future()) {
+            }
+
+            void run() {
+                this->value = this->init();
+
+                p.set_value();
+
+                this->ran = true;
+            }
 
             inline operator value_type &() {
                 return this->get();
             }
 
             inline value_type &get() {
-                bool expect_ran = false;
+                if( !this->ran ) {
+                    std::call_once( once, &LazyStatic::run, this );
 
-                ran.compare_exchange_strong( expect_ran, true );
-
-                if( !expect_ran ) {
-                    this->init();
-                }
-
-                return *value;
-            }
-
-            ~LazyStatic() {
-                delete this->value;
-            }
-        };
-
-        /*
-         * Specialization for fundemental type that don't require heap allocations
-         * */
-        template <typename T>
-        struct LazyStatic<T, true> {
-            typedef T value_type;
-
-            value_type       value;
-            std::atomic_bool ran;
-
-            virtual void init() = 0;
-
-            inline operator value_type &() {
-                return this->get();
-            }
-
-            inline value_type &get() {
-                bool expect_ran = false;
-
-                ran.compare_exchange_strong( expect_ran, true );
-
-                if( !expect_ran ) {
-                    this->init();
+                    if( !this->ran ) {
+                        s.wait();
+                    }
                 }
 
                 return value;
             }
         };
+
+        template <class T, class Compare>
+        inline const T &clamp( const T &v, const T &lo, const T &hi, Compare comp ) {
+            assert( !comp( hi, lo ));
+
+            return comp( v, lo ) ? lo : comp( hi, v ) ? hi : v;
+        }
+
+        template <class T>
+        inline const T &clamp( const T &v, const T &lo, const T &hi ) {
+            return clamp( v, lo, hi, std::less<>());
+        }
     }
 }
 
