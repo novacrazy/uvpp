@@ -13,9 +13,6 @@
 #include "../detail/type_traits.hpp"
 #include "../detail/data.hpp"
 
-#include <future>
-#include <memory>
-
 namespace uv {
     struct RequestData : detail::UserData {
         std::shared_ptr<void> continuation;
@@ -51,14 +48,22 @@ namespace uv {
                     REQ_TYPE_MAX = UV_REQ_TYPE_MAX
             };
 
+            enum {
+                REQUEST_PENDING   = 0,
+                REQUEST_IDLE      = ( 1 << 0 ),
+                REQUEST_ACTIVE    = ( 1 << 1 ),
+                REQUEST_CANCELLED = ( 1 << 2 ),
+                REQUEST_FINISHED  = ( 1 << 3 )
+            };
+
         protected:
             RequestData internal_data;
 
-            uv_loop_t *_loop;
+            uv_loop_t *_uv_loop;
             Loop      *_parent_loop;
 
-            request_t        _request;
-            std::atomic_bool cancelled;
+            request_t       _request;
+            std::atomic_int _status;
 
             //Implemented in derived classes
             virtual void _init() = 0;
@@ -68,7 +73,7 @@ namespace uv {
                 assert( l != nullptr );
 
                 this->_parent_loop = p;
-                this->_loop        = l;
+                this->_uv_loop     = l;
 
                 this->handle()->data = &this->internal_data;
 
@@ -87,21 +92,60 @@ namespace uv {
             }
 
         public:
-            inline Request() : internal_data( this ) {}
+            inline Request() : internal_data( this ), _status( REQUEST_IDLE ) {}
 
             //Implemented in Loop.hpp to pass Loop::handle() to this->init(uv_loop_t*)
             inline void init( Loop * );
 
             std::thread::id loop_thread();
 
-            inline void cancel() {
-                assert( std::this_thread::get_id() == this->loop_thread());
+            inline std::shared_future<void> cancel() {
+                if( std::this_thread::get_id() == this->loop_thread()) {
+                    if( this->_status == REQUEST_ACTIVE ) {
+                        return detail::make_exception_future<void>( ::uv::Exception( UV_EBUSY ));
 
-                int res = uv_cancel((uv_req_t *)this->handle());
+                    } else {
+                        int res = uv_cancel((uv_req_t *)this->handle());
 
-                if( res != 0 ) {
-                    throw ::uv::Exception( res );
+                        if( res != 0 ) {
+                            return detail::make_exception_future<void>( ::uv::Exception( res ));
+
+                        } else {
+                            this->_status = REQUEST_CANCELLED;
+
+                            return detail::make_ready_future();
+                        }
+                    }
+
+                } else {
+                    return detail::schedule( this->loop(), [this] {
+                        return this->cancel().get();
+                    } );
                 }
+            }
+
+            inline int status() const {
+                return this->_status;
+            }
+
+            inline bool is_idle() const {
+                return this->_status == REQUEST_IDLE;
+            }
+
+            inline bool is_pending() const {
+                return this->_status == REQUEST_PENDING;
+            }
+
+            inline bool is_cancelled() const {
+                return this->_status == REQUEST_CANCELLED;
+            }
+
+            inline bool is_active() const {
+                return this->_status == REQUEST_ACTIVE;
+            }
+
+            inline bool is_finished() const {
+                return this->_status == REQUEST_FINISHED;
             }
 
             inline size_t size() {
