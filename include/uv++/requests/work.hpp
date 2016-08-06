@@ -150,14 +150,12 @@ namespace uv {
                         }
                     }
 
-                    //Copy the shared_ptr for the shared_future here, so it still exists when referenced below
-                    auto result = c->s;
-
-                    return std::async( std::launch::deferred, [this, c, result]() -> result_type {
-                        c->finished.get_future().get();
+                    return std::async( std::launch::deferred, [this]( std::shared_ptr<Cont> sc,
+                                                                      std::shared_ptr<std::shared_future<result_type>> result ) -> result_type {
+                        sc->finished.get_future().get();
 
                         return result->get();
-                    } );
+                    }, c, c->s );
                 }
             }
 
