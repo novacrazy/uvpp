@@ -21,10 +21,6 @@
 
 #include <boost/lockfree/queue.hpp>
 
-#ifndef UV_LOCKFREE_QUEUE_SIZE
-#define UV_LOCKFREE_QUEUE_SIZE 128
-#endif
-
 #else
 
 #include <mutex>
@@ -60,7 +56,7 @@ namespace uv {
         private:
             bool external;
 
-            Filesystem _fs;
+            std::shared_ptr<Filesystem> _fs;
 
             std::atomic_bool stopped;
 
@@ -105,6 +101,8 @@ namespace uv {
 #endif
                     this->update_time();
                 } );
+
+                this->_fs = std::make_shared<Filesystem>( this );
             }
 
             inline void _stop() {
@@ -123,7 +121,7 @@ namespace uv {
             }
 
             inline Loop()
-                : _fs( this ), external( false ), loop_thread( std::this_thread::get_id())
+                : external( false ), loop_thread( std::this_thread::get_id())
 #ifdef UV_USE_BOOST_LOCKFREE
                 , task_queue( UV_LOCKFREE_QUEUE_SIZE )
 #endif
@@ -132,7 +130,7 @@ namespace uv {
             }
 
             explicit inline Loop( handle_t *l )
-                : _fs( this ), external( true ), loop_thread( std::this_thread::get_id())
+                : external( true ), loop_thread( std::this_thread::get_id())
 #ifdef UV_USE_BOOST_LOCKFREE
                 , task_queue( UV_LOCKFREE_QUEUE_SIZE )
 #endif
@@ -140,8 +138,8 @@ namespace uv {
                 this->init( this, l );
             }
 
-            inline Filesystem *fs() {
-                return &_fs;
+            inline std::shared_ptr<Filesystem> fs() {
+                return _fs;
             }
 
             inline int run( run_mode mode = RUN_DEFAULT ) {
