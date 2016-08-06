@@ -7,10 +7,16 @@
 
 #include "fwd.hpp"
 
+#include "detail/utils.hpp"
+
 namespace uv {
     //I would still recommend the stuff in <chrono> though
     inline uint64_t hrtime() {
         return uv_hrtime();
+    }
+
+    namespace misc {
+        using detail::then;
     }
 }
 

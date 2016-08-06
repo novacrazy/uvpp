@@ -135,6 +135,82 @@ namespace uv {
         inline const T &clamp( const T &v, const T &lo, const T &hi ) {
             return clamp( v, lo, hi, std::less<>());
         }
+
+        template <typename T, typename Functor>
+        struct then_helper {
+            template <typename... Args>
+            inline static decltype( auto ) do_then( std::future<T> &&t, Functor &&f, Args... args ) {
+                return f( t.get(), std::forward<Args>( args )... );
+            }
+
+            template <typename... Args>
+            inline static decltype( auto ) do_then( std::shared_future<T> &&t, Functor &&f, Args... args ) {
+                return f( t.get(), std::forward<Args>( args )... );
+            }
+        };
+
+        template <typename Functor>
+        struct then_helper<void, Functor> {
+            template <typename... Args>
+            inline static decltype( auto ) do_then( std::future<void> &&t, Functor &&f, Args... args ) {
+                t.get();
+
+                return f( std::forward<Args>( args )... );
+            }
+
+            template <typename... Args>
+            inline static decltype( auto ) do_then( std::shared_future<void> &&t, Functor &&f, Args... args ) {
+                t.get();
+
+                return f( std::forward<Args>( args )... );
+            }
+        };
+
+        template <typename T, typename Functor, typename... Args>
+        inline decltype( auto ) then( std::launch policy, std::future<T> &&t, Functor &&f, Args... args ) {
+            return std::async( policy, []( std::future<T> &&t2, Functor &&f2, Args... inner_args ) {
+                return then_helper<T, Functor>::do_then( std::move( t2 ), std::move( f2 ),
+                                                         std::forward<Args>( inner_args )... );
+            }, std::move( t ), std::move( f ), std::forward<Args>( args )... );
+        };
+
+        template <typename T, typename Functor, typename... Args>
+        inline decltype( auto ) then( std::future<T> &&t, Functor &&f, Args ... args ) {
+            constexpr auto policy = std::launch::deferred | std::launch::async; //Default policy for std::async
+
+            return std::async( policy, []( std::future<T> &&t2, Functor &&f2, Args... inner_args ) {
+                return then_helper<T, Functor>::do_then( std::move( t2 ), std::move( f2 ),
+                                                         std::forward<Args>( inner_args )... );
+            }, std::move( t ), std::move( f ), std::forward<Args>( args )... );
+        };
+
+        template <typename T, typename Functor, typename... Args>
+        inline decltype( auto ) then( std::launch policy, std::shared_future<T> &&t, Functor &&f, Args... args ) {
+            return std::async( policy, []( std::shared_future<T> &&t2, Functor &&f2, Args... inner_args ) {
+                return then_helper<T, Functor>::do_then( std::move( t2 ), std::move( f2 ),
+                                                         std::forward<Args>( inner_args )... );
+            }, std::move( t ), std::move( f ), std::forward<Args>( args )... );
+        };
+
+        template <typename T, typename Functor, typename... Args>
+        inline decltype( auto ) then( std::shared_future<T> &&t, Functor &&f, Args ... args ) {
+            constexpr auto policy = std::launch::deferred | std::launch::async; //Default policy for std::async
+
+            return std::async( policy, []( std::shared_future<T> &&t2, Functor &&f2, Args... inner_args ) {
+                return then_helper<T, Functor>::do_then( std::move( t2 ), std::move( f2 ),
+                                                         std::forward<Args>( inner_args )... );
+            }, std::move( t ), std::move( f ), std::forward<Args>( args )... );
+        };
+
+        template <typename T, typename... Args>
+        inline decltype( auto ) then( std::promise<T> &t, Args... args ) {
+            return then( t.get_future(), std::forward<Args>( args )... );
+        };
+
+        template <typename T, typename... Args>
+        inline decltype( auto ) then( std::launch policy, std::promise<T> &t, Args... args ) {
+            return then( policy, t.get_future(), std::forward<Args>( args )... );
+        };
     }
 }
 
