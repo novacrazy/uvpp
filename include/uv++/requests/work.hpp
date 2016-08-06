@@ -150,8 +150,8 @@ namespace uv {
                         }
                     }
 
-                    return std::async( std::launch::deferred, [this]( std::shared_ptr<Cont> sc,
-                                                                      std::shared_ptr<std::shared_future<result_type>> result ) -> result_type {
+                    return std::async( std::launch::deferred, []( std::shared_ptr<Cont> sc,
+                                                                  std::shared_ptr<std::shared_future<result_type>> result ) {
                         sc->finished.get_future().get();
 
                         return result->get();
