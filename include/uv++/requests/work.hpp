@@ -59,6 +59,48 @@ namespace uv {
                 this->cancel();
             }
 
+        private:
+            template <typename Cont>
+            void do_queue() {
+                uv_queue_work( this->_uv_loop, this->request(), []( uv_work_t *w ) {
+                    RequestData *d = static_cast<RequestData *>(w->data);
+
+                    Work *self = static_cast<Work *>(d->self);
+
+                    int expect_pending = REQUEST_PENDING;
+
+                    self->_status.compare_exchange_strong( expect_pending, REQUEST_ACTIVE );
+
+                    if( expect_pending == Work::REQUEST_PENDING ) {
+                        Cont *sc = static_cast<Cont *>(d->continuation.get());
+
+                        sc->dispatch();
+                    }
+
+                }, []( uv_work_t *w, int status ) {
+                    RequestData *d = static_cast<RequestData *>(w->data);
+
+                    Work *self = static_cast<Work *>(d->self);
+
+                    int expect_active = REQUEST_ACTIVE;
+
+                    self->_status.compare_exchange_strong( expect_active, REQUEST_FINISHED );
+
+                    Cont *sc = static_cast<Cont *>(d->continuation.get());
+
+                    if( status != 0 ) {
+                        sc->finished.set_exception( std::make_exception_ptr( ::uv::Exception( status )));
+
+                    } else if( expect_active != REQUEST_ACTIVE ) {
+                        //TODO: Better error message on this
+                        sc->finished.set_exception( std::make_exception_ptr( ::uv::Exception( "invalid state" )));
+
+                    } else {
+                        sc->finished.set_value();
+                    }
+                } );
+            }
+
         public:
             static size_t num_workers() {
                 static detail::NumWorkers num;
@@ -98,46 +140,14 @@ namespace uv {
                     c->init( this, std::forward<Args>( args )... );
 
                     if( last_status != REQUEST_PENDING ) {
-                        detail::schedule( this->loop(), [this, c] {
-                            uv_queue_work( this->_uv_loop, this->request(), []( uv_work_t *w ) {
-                                RequestData *d = static_cast<RequestData *>(w->data);
-
-                                Work *self = static_cast<Work *>(d->self);
-
-                                int expect_pending = REQUEST_PENDING;
-
-                                self->_status.compare_exchange_strong( expect_pending, REQUEST_ACTIVE );
-
-                                if( expect_pending == Work::REQUEST_PENDING ) {
-                                    Cont *sc = static_cast<Cont *>(d->continuation.get());
-
-                                    sc->dispatch();
-                                }
-
-                            }, []( uv_work_t *w, int status ) {
-                                RequestData *d = static_cast<RequestData *>(w->data);
-
-                                Work *self = static_cast<Work *>(d->self);
-
-                                int expect_active = REQUEST_ACTIVE;
-
-                                self->_status.compare_exchange_strong( expect_active, REQUEST_FINISHED );
-
-                                Cont *sc = static_cast<Cont *>(d->continuation.get());
-
-                                if( status != 0 ) {
-                                    sc->finished.set_exception( std::make_exception_ptr( ::uv::Exception( status )));
-
-                                } else if( expect_active != REQUEST_ACTIVE ) {
-                                    //TODO: Better error message on this
-                                    sc->finished.set_exception(
-                                        std::make_exception_ptr( ::uv::Exception( "invalid state" )));
-
-                                } else {
-                                    sc->finished.set_value();
-                                }
+                        if( std::this_thread::get_id() != this->loop_thread()) {
+                            detail::schedule( this->loop(), [this] {
+                                this->do_queue<Cont>();
                             } );
-                        } );
+
+                        } else {
+                            this->do_queue<Cont>();
+                        }
                     }
 
                     //Copy the shared_ptr for the shared_future here, so it still exists when referenced below
