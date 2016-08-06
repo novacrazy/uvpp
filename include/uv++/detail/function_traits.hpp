@@ -149,7 +149,7 @@ namespace uv {
         struct first_arg_is {
             typedef typename function_traits<Functor>::template arg<0>::type first_arg;
 
-            static constexpr bool value = std::is_same<first_arg, T>::value;
+            static constexpr bool value = std::is_convertible<first_arg, T>::value;
         };
 
         template <typename Functor, typename T>
