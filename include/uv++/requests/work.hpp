@@ -150,12 +150,9 @@ namespace uv {
                         }
                     }
 
-                    return std::async( std::launch::deferred, []( std::shared_ptr<Cont> sc,
-                                                                  std::shared_ptr<std::shared_future<result_type>> result ) {
-                        sc->finished.get_future().get();
-
+                    return detail::then( std::launch::deferred, c->finished, []( auto result ) {
                         return result->get();
-                    }, c, c->s );
+                    }, c->s );
                 }
             }
 
