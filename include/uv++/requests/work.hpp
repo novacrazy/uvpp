@@ -150,9 +150,10 @@ namespace uv {
                         }
                     }
 
-                    return detail::then( std::launch::deferred, c->finished, []( auto result ) {
-                        return result->get();
-                    }, c->s );
+                    auto result = c->s;
+
+                    //I love this line. So succinct.
+                    return detail::then( c->finished, [result] { return *result; } );
                 }
             }
 
