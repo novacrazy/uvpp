@@ -66,8 +66,6 @@ namespace uv {
             //Implemented in Loop.hpp to pass Loop::handle() to this->init(uv_loop_t*)
             inline void init( Loop * );
 
-            std::thread::id loop_thread();
-
             void stop() {
                 assert( std::this_thread::get_id() == this->loop_thread());
 
@@ -77,10 +75,6 @@ namespace uv {
             virtual void start() {
                 throw new ::uv::Exception( UV_ENOSYS );
             };
-
-            inline Loop *loop() {
-                return this->_parent_loop;
-            }
     };
 
     template <typename H, typename D>

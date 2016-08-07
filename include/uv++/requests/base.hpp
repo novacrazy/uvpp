@@ -95,8 +95,6 @@ namespace uv {
             //Implemented in Loop.hpp to pass Loop::handle() to this->init(uv_loop_t*)
             inline void init( Loop * );
 
-            std::thread::id loop_thread();
-
             inline std::shared_future<void> cancel() {
                 if( std::this_thread::get_id() == this->loop_thread()) {
                     if( this->_status == REQUEST_ACTIVE ) {
@@ -126,12 +124,12 @@ namespace uv {
                 return this->_status;
             }
 
-            inline bool is_idle() const {
-                return this->_status == REQUEST_IDLE;
-            }
-
             inline bool is_pending() const {
                 return this->_status == REQUEST_PENDING;
+            }
+
+            inline bool is_idle() const {
+                return this->_status == REQUEST_IDLE;
             }
 
             inline bool is_cancelled() const {
@@ -148,10 +146,6 @@ namespace uv {
 
             inline size_t size() {
                 return uv_req_size( this->request()->type );
-            }
-
-            inline Loop *loop() {
-                return this->_parent_loop;
             }
 
             inline const request_t *request() const {

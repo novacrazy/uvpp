@@ -37,6 +37,8 @@ namespace uv {
             friend
             class Handle;
 
+            friend class detail::FromLoop;
+
             friend class fs::Filesystem;
 
             enum run_mode : std::underlying_type<uv_run_mode>::type {
@@ -73,16 +75,17 @@ namespace uv {
             std::mutex                 schedule_mutex;
 #endif
             std::shared_ptr<Async> schedule_async;
-            std::thread::id        loop_thread;
 
         protected:
+            std::thread::id _loop_thread;
+
             inline void _init() {
                 if( !this->external ) {
                     uv_loop_init( this->handle());
                 }
 
                 this->schedule_async = this->async( [this] {
-                    assert( std::this_thread::get_id() == this->loop_thread );
+                    assert( std::this_thread::get_id() == this->loop_thread());
 
 #ifdef UV_USE_BOOST_LOCKFREE
                     this->task_queue.consume_all( [this]( scheduled_task &task ) {
@@ -121,7 +124,7 @@ namespace uv {
             }
 
             inline Loop()
-                : external( false ), loop_thread( std::this_thread::get_id())
+                : external( false ), _loop_thread( std::this_thread::get_id())
 #ifdef UV_USE_BOOST_LOCKFREE
                 , task_queue( UV_LOCKFREE_QUEUE_SIZE )
 #endif
@@ -130,7 +133,7 @@ namespace uv {
             }
 
             explicit inline Loop( handle_t *l )
-                : external( true ), loop_thread( std::this_thread::get_id())
+                : external( true ), _loop_thread( std::this_thread::get_id())
 #ifdef UV_USE_BOOST_LOCKFREE
                 , task_queue( UV_LOCKFREE_QUEUE_SIZE )
 #endif
@@ -145,7 +148,7 @@ namespace uv {
             inline int run( run_mode mode = RUN_DEFAULT ) {
                 this->stopped = false;
 
-                this->loop_thread = std::this_thread::get_id();
+                this->_loop_thread = std::this_thread::get_id();
 
                 return uv_run( handle(), (uv_run_mode)( mode ));
             }
@@ -201,14 +204,10 @@ namespace uv {
                 this->run_forever( mode );
             }
 
-            inline std::thread::id thread_id() const {
-                return this->loop_thread;
-            }
-
             template <typename... Args>
             typename std::enable_if<detail::all_type<uv_loop_option, Args...>::value, Loop &>::type
             configure( Args &&... args ) {
-                assert( std::this_thread::get_id() == this->loop_thread );
+                assert( std::this_thread::get_id() == this->loop_thread());
 
                 auto res = uv_loop_configure( this->handle(), std::forward<Args>( args )... );
 
@@ -224,13 +223,13 @@ namespace uv {
             }
 
             inline int backend_fd() const {
-                assert( std::this_thread::get_id() == this->loop_thread );
+                assert( std::this_thread::get_id() == this->loop_thread());
 
                 return uv_backend_fd( handle());
             }
 
             inline int backend_timeout() const {
-                assert( std::this_thread::get_id() == this->loop_thread );
+                assert( std::this_thread::get_id() == this->loop_thread());
 
                 return uv_backend_timeout( handle());
             }
@@ -245,7 +244,7 @@ namespace uv {
 
             //returns true on closed
             inline bool try_close( int *resptr = nullptr ) {
-                assert( std::this_thread::get_id() == this->loop_thread );
+                assert( std::this_thread::get_id() == this->loop_thread());
 
                 int res = uv_loop_close( this->handle());
 
@@ -298,21 +297,21 @@ namespace uv {
         public:
             template <typename... Args>
             inline std::shared_ptr<Idle> idle( Args &&... args ) {
-                assert( std::this_thread::get_id() == this->loop_thread );
+                assert( std::this_thread::get_id() == this->loop_thread());
 
                 return new_handle<Idle>( std::forward<Args>( args )... );
             }
 
             template <typename... Args>
             inline std::shared_ptr<Prepare> prepare( Args &&... args ) {
-                assert( std::this_thread::get_id() == this->loop_thread );
+                assert( std::this_thread::get_id() == this->loop_thread());
 
                 return new_handle<Prepare>( std::forward<Args>( args )... );
             }
 
             template <typename... Args>
             inline std::shared_ptr<Check> check( Args &&... args ) {
-                assert( std::this_thread::get_id() == this->loop_thread );
+                assert( std::this_thread::get_id() == this->loop_thread());
 
                 return new_handle<Check>( std::forward<Args>( args )... );
             }
@@ -325,7 +324,7 @@ namespace uv {
                                                  const std::chrono::duration<_Rep2, _Period2> &repeat =
                                                  std::chrono::duration<_Rep2, _Period2>(
                                                      std::chrono::duration_values<_Rep2>::zero())) {
-                assert( std::this_thread::get_id() == this->loop_thread );
+                assert( std::this_thread::get_id() == this->loop_thread());
 
                 return new_handle<Timer>( f, timeout, repeat );
             }
@@ -338,7 +337,7 @@ namespace uv {
                                                   const std::chrono::duration<_Rep2, _Period2> &timeout =
                                                   std::chrono::duration<_Rep2, _Period2>(
                                                       std::chrono::duration_values<_Rep2>::zero())) {
-                assert( std::this_thread::get_id() == this->loop_thread );
+                assert( std::this_thread::get_id() == this->loop_thread());
 
                 return new_handle<Timer>( f, timeout, repeat );
             }
@@ -386,14 +385,14 @@ namespace uv {
 
             template <typename Functor>
             inline std::shared_ptr<AsyncDetail<Functor>> async( Functor f ) {
-                assert( std::this_thread::get_id() == this->loop_thread );
+                assert( std::this_thread::get_id() == this->loop_thread());
 
                 return new_handle<AsyncDetail<Functor>>( f );
             }
 
             template <typename... Args>
             inline std::shared_ptr<Signal> signal( Args &&... args ) {
-                assert( std::this_thread::get_id() == this->loop_thread );
+                assert( std::this_thread::get_id() == this->loop_thread());
 
                 return new_handle<Signal>( std::forward<Args>( args )... );
             }
@@ -442,7 +441,7 @@ namespace uv {
             void print_handles( std::basic_ostream<_Char> &out, bool only_active = false ) const {
                 typedef void *UV_QUEUE[2];
 
-                assert( std::this_thread::get_id() == this->loop_thread );
+                assert( std::this_thread::get_id() == this->loop_thread());
 #ifndef _WIN32
                 enum {
                   UV__HANDLE_INTERNAL = 0x8000,
@@ -547,14 +546,8 @@ namespace uv {
         };
     }
 
-    template <typename H, typename D>
-    inline std::thread::id HandleBase<H, D>::loop_thread() {
-        return this->loop()->thread_id();
-    };
-
-    template <typename H, typename D>
-    inline std::thread::id Request<H, D>::loop_thread() {
-        return this->loop()->thread_id();
+    inline std::thread::id detail::FromLoop::loop_thread() const {
+        return this->loop()->_loop_thread;
     };
 
     template <typename H, typename D>
@@ -592,7 +585,7 @@ namespace uv {
                 d->close_continuation.reset();
             };
 
-            if( std::this_thread::get_id() != this->loop()->loop_thread ) {
+            if( std::this_thread::get_id() != this->loop()->loop_thread()) {
                 this->loop()->schedule( [this, cb] {
                     uv_close((uv_handle_t *)this->handle(), cb );
                 } );
