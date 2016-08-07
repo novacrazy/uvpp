@@ -14,7 +14,7 @@ namespace uv {
 
         protected:
             inline void _init() {
-                uv_timer_init( this->_loop, &_handle );
+                uv_timer_init( this->_uv_loop, &_handle );
             }
 
             inline void _stop() {
@@ -37,7 +37,7 @@ namespace uv {
 
                 this->internal_data.continuation = std::make_shared<Cont>( f );
 
-                uv_timer_start( &_handle, []( uv_timer_t *h ) {
+                uv_timer_start( this->handle(), []( uv_timer_t *h ) {
                                     HandleData *d = static_cast<HandleData *>(h->data);
 
                                     Timer *self = static_cast<Timer *>(d->self);

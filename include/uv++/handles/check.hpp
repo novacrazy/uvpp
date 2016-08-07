@@ -14,7 +14,7 @@ namespace uv {
 
         protected:
             inline void _init() {
-                uv_check_init( this->_loop, &_handle );
+                uv_check_init( this->_uv_loop, &_handle );
             }
 
             inline void _stop() {
@@ -28,7 +28,7 @@ namespace uv {
 
                 this->internal_data.continuation = std::make_shared<Cont>( f );
 
-                uv_check_start( &_handle, []( uv_check_t *h ) {
+                uv_check_start( this->handle(), []( uv_check_t *h ) {
                     HandleData *d = static_cast<HandleData *>(h->data);
 
                     Check *self = static_cast<Check *>(d->self);

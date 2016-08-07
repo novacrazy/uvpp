@@ -6,7 +6,7 @@
 #define UV_BASE_REQUEST_HPP
 
 
-#include "../fwd.hpp"
+#include "../detail/base.hpp"
 
 #include "../exception.hpp"
 
@@ -27,7 +27,8 @@ namespace uv {
 
     template <typename R, typename D>
     class Request : public std::enable_shared_from_this<Request<R, D>>,
-                    public detail::UserDataAccess<RequestData, R> {
+                    public detail::UserDataAccess<RequestData, R>,
+                    public detail::FromLoop {
         public:
             typedef typename detail::UserDataAccess<RequestData, R>::handle_t request_t;
             typedef D                                                         derived_type;
@@ -58,9 +59,6 @@ namespace uv {
 
         protected:
             RequestData internal_data;
-
-            uv_loop_t *_uv_loop;
-            Loop      *_parent_loop;
 
             request_t       _request;
             std::atomic_int _status;

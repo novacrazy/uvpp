@@ -14,7 +14,7 @@ namespace uv {
 
         protected:
             inline void _init() {
-                uv_idle_init( this->_loop, &_handle );
+                uv_idle_init( this->_uv_loop, &_handle );
             }
 
             inline void _stop() {
@@ -28,7 +28,7 @@ namespace uv {
 
                 this->internal_data.continuation = std::make_shared<Cont>( f );
 
-                uv_idle_start( &_handle, []( uv_idle_t *h ) {
+                uv_idle_start( this->handle(), []( uv_idle_t *h ) {
                     HandleData *d = static_cast<HandleData *>(h->data);
 
                     Idle *self = static_cast<Idle *>(d->self);

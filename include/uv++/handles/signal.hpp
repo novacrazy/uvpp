@@ -15,7 +15,7 @@ namespace uv {
 
         protected:
             void _init() {
-                uv_signal_init( this->_loop, &_handle );
+                uv_signal_init( this->_uv_loop, &_handle );
             }
 
             void _stop() {
@@ -29,7 +29,7 @@ namespace uv {
 
                 this->internal_data.continuation = std::make_shared<Cont>( f );
 
-                uv_signal_start( &_handle, []( uv_signal_t *h, int sn ) {
+                uv_signal_start( this->handle(), []( uv_signal_t *h, int sn ) {
                     HandleData *d = static_cast<HandleData *>(h->data);
 
                     Signal *self = static_cast<Signal *>(d->self);
@@ -39,7 +39,7 @@ namespace uv {
             }
 
             std::string signame() const {
-                return detail::signame( _handle.signum );
+                return detail::signame( this->handle()->signum );
             }
     };
 }

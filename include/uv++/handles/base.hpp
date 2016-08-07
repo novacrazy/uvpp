@@ -5,6 +5,8 @@
 #ifndef UV_BASE_HANDLE_HPP
 #define UV_BASE_HANDLE_HPP
 
+#include "../detail/base.hpp"
+
 #include "../detail/data.hpp"
 
 #include "../exception.hpp"
@@ -31,16 +33,14 @@ namespace uv {
 
     template <typename H, typename D>
     class HandleBase : public std::enable_shared_from_this<D>,
-                       public detail::UserDataAccess<HandleData, H> {
+                       public detail::UserDataAccess<HandleData, H>,
+                       public detail::FromLoop {
         public:
             typedef typename detail::UserDataAccess<HandleData, H>::handle_t handle_t;
             typedef D                                                        derived_type;
 
         protected:
             HandleData internal_data;
-
-            uv_loop_t *_loop;
-            Loop      *_parent_loop;
 
             //Implemented in derived classes
             virtual void _init() = 0;
@@ -53,7 +53,7 @@ namespace uv {
                 assert( l != nullptr );
 
                 this->_parent_loop = p;
-                this->_loop        = l;
+                this->_uv_loop        = l;
 
                 this->handle()->data = &this->internal_data;
 

@@ -71,7 +71,7 @@ namespace uv {
 
                 this->is_sending = false;
 
-                uv_async_init( this->_loop, this->handle(), []( uv_async_t *h ) {
+                uv_async_init( this->_uv_loop, this->handle(), []( uv_async_t *h ) {
                     HandleData *d = static_cast<HandleData *>(h->data);
 
                     auto *self = static_cast<AsyncDetail<Functor> *>(d->self);

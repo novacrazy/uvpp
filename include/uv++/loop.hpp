@@ -37,7 +37,7 @@ namespace uv {
             friend
             class Handle;
 
-            friend class Filesystem;
+            friend class fs::Filesystem;
 
             enum run_mode : std::underlying_type<uv_run_mode>::type {
                 RUN_DEFAULT = UV_RUN_DEFAULT,
@@ -56,7 +56,7 @@ namespace uv {
         private:
             bool external;
 
-            std::shared_ptr<Filesystem> _fs;
+            std::shared_ptr<fs::Filesystem> _fs;
 
             std::atomic_bool stopped;
 
@@ -102,7 +102,7 @@ namespace uv {
                     this->update_time();
                 } );
 
-                this->_fs = std::make_shared<Filesystem>( this );
+                this->_fs = std::make_shared<fs::Filesystem>( this );
             }
 
             inline void _stop() {
@@ -113,11 +113,11 @@ namespace uv {
 
         public:
             inline const handle_t *handle() const {
-                return _loop;
+                return _uv_loop;
             }
 
             inline handle_t *handle() {
-                return _loop;
+                return _uv_loop;
             }
 
             inline Loop()
@@ -138,7 +138,7 @@ namespace uv {
                 this->init( this, l );
             }
 
-            inline std::shared_ptr<Filesystem> fs() {
+            inline std::shared_ptr<fs::Filesystem> fs() {
                 return _fs;
             }
 
@@ -210,7 +210,7 @@ namespace uv {
             configure( Args &&... args ) {
                 assert( std::this_thread::get_id() == this->loop_thread );
 
-                auto res = uv_loop_configure( handle(), std::forward<Args>( args )... );
+                auto res = uv_loop_configure( this->handle(), std::forward<Args>( args )... );
 
                 if( res != 0 ) {
                     throw Exception( res );
@@ -247,7 +247,7 @@ namespace uv {
             inline bool try_close( int *resptr = nullptr ) {
                 assert( std::this_thread::get_id() == this->loop_thread );
 
-                int res = uv_loop_close( handle());
+                int res = uv_loop_close( this->handle());
 
                 if( resptr != nullptr ) {
                     *resptr = res;
@@ -530,10 +530,10 @@ namespace uv {
     }
 
     //TODO: Replace this with something similar to the above init functions
-    void Filesystem::init( Loop *l ) {
+    void fs::Filesystem::init( Loop *l ) {
         assert( l != nullptr );
 
-        this->_loop = l->handle();
+        this->_uv_loop = l->handle();
     }
 
     namespace detail {
