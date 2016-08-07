@@ -7,6 +7,68 @@ The github name is uvpp because github didn't like uv++ as the repository name. 
 
 ## HEAVILY WORK IN PROGRESS!
 
+### Example
+
+You might notice the use of `.get()` for async operations; that's because uv++ uses `promise`s, `future`s, and `shared_future`s for asynchronous results.
+
+```C++
+#define UV_OVERLOAD_OSTREAM
+#define UV_USE_BOOST_LOCKFREE
+
+#include <uv++/uv++.hpp>
+
+#include <iostream>
+#include <chrono>
+#include <thread>
+
+using namespace std;
+
+int main() {
+    auto loop = uv::default_loop();
+    
+    //Run this callback once per second
+    loop->interval(1s, [] {
+        cout << "\aBeep" << endl;
+    });
+    
+    //Create an async task that has three parameters and a return value
+    auto a = loop->async([] (int x, int y, int z) {
+        return x + y * z;
+    });
+    
+    thread([=] {
+        //Open file synchronously
+        auto f = loop->fs()->openSync("main.cpp");
+        
+        //Read in the file asynchronously and wait on the result
+        cout << f.read().get() << endl;
+        
+        //When out of scope, f will schedule itself to be closed on the event loop thread
+    }).detach();
+    
+    thread([=] {
+        loop->schedule([=] {
+            cout << "This function is run on the loop thread." << endl;
+        }).get();
+        
+        loop->work()->queue([=] {
+            cout << "This function is running in the libuv thread-pool." << endl;
+            
+            //Send a request to the async task and wait on the result.
+            cout << a->send(1, 2, 3).get() << endl; //Will print 9
+            
+            std::this_thread::sleep_for(2s);
+        }).get();
+        
+    }).detach();
+    
+    //Start the loop.
+    loop->start();
+}
+```
+
+And I'll add more if I think of it, but basically uv++ has all the functionality of libuv, but mostly thread-safe, type-safe, memory-safe and more flexible.
+
 #### Known issues:
 
 * Just that it's incomplete
