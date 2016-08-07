@@ -47,6 +47,15 @@ namespace uv {
 
                     return std::static_pointer_cast<R>( p->user_data );
                 }
+
+                template <typename R = void>
+                inline std::shared_ptr<R> data() {
+                    const HandleData *p = static_cast<HandleData *>(this->handle()->data);
+
+                    assert( p != nullptr );
+
+                    return std::static_pointer_cast<R>( p->user_data );
+                }
         };
     }
 }
