@@ -244,8 +244,10 @@ namespace uv {
                 return then( s.get_future(), f, policy );
             };
         }
+    }
 
-        using _then::then;
+    namespace util {
+        using detail::_then::then;
     }
 }
 

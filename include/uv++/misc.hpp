@@ -14,10 +14,6 @@ namespace uv {
     inline uint64_t hrtime() {
         return uv_hrtime();
     }
-
-    namespace misc {
-        using detail::then;
-    }
 }
 
 #endif //UV_MISC_HPP
