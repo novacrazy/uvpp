@@ -41,7 +41,7 @@ int main() {
         auto f = loop->fs()->openSync("main.cpp");
         
         //Read in the file asynchronously and wait on the result
-        cout << f.read().get() << endl;
+        cout << f->read().get() << endl;
         
         //When out of scope, f will schedule itself to be closed on the event loop thread
     }).detach();
