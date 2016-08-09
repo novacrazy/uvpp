@@ -70,6 +70,10 @@ namespace uv {
                 std::string permissions() const noexcept {
                     std::string buf( "drwxrwxrwx" );
 
+                    /*
+                     * I actually learned this technique from libuv itself, in the print_handles function.
+                     * It's rather nice for this.
+                     * */
                     buf[0] = "-d"[this->is_dir()];
                     buf[1] = "-r"[( this->st_mode & S_IRUSR ) != 0];
                     buf[2] = "-w"[( this->st_mode & S_IWUSR ) != 0];
@@ -202,19 +206,19 @@ inline std::basic_ostream<_Char> &operator<<( std::basic_ostream<_Char> &out, co
 
     out << right << setw( 8 ) << "Size: " << left << setw( max_width ) << s.st_size
         << left << setw( 8 ) << "Blocks: " << left << setw( max_width ) << s.st_blocks
-        << left << setw( 8 ) << "IO Blocks: " << s.st_blksize << "   " << type;
+        << left << setw( 8 ) << "IO Block: " << s.st_blksize << "   " << type;
 
     out << '\n';
 
     out << right << setw( 8 ) << "Device: " << left << setw( max_width ) << device_str
         << left << setw( 8 ) << "Inode: " << left << setw( max_width ) << s.st_ino
-        << left << setw( 11 ) << "Links: " << s.st_nlink;
+        << left << setw( 10 ) << "Links: " << s.st_nlink;
 
     out << '\n';
 
     out << right << setw( 8 ) << "Access: (0" << oct << ( s.st_mode & all_modes ) << '/' << s.permissions() << left << setw( perm_width ) << ")"
         << left << setw( 8 ) << "Uid: " << left << setw( max_width ) << s.st_uid
-        << left << setw( 11 ) << "Gid: " << s.st_gid;
+        << left << setw( 10 ) << "Gid: " << s.st_gid;
 
     out << '\n';
 
