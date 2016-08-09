@@ -276,45 +276,51 @@ namespace uv {
 
         protected:
             template <typename H, typename... Args>
-            std::shared_ptr<H> new_handle( Args &&... args ) {
+            std::shared_ptr<H> new_handle( bool requires_loop_thread, Args... args ) {
                 std::lock_guard<std::mutex> lock( this->handle_set_mutex );
 
-                std::shared_ptr<H> p = std::make_shared<H>();
+                if( requires_loop_thread && this->loop_thread() != std::this_thread::get_id()) {
+                    /*
+                     * If the new_handle request is not on the loop thread, block until everything is initialized there
+                     *
+                     * Not the best solution, but it just has to wait it's turn I guess. **shrugs**
+                     * */
+                    return this->schedule( []( Loop *self, Args... inner_args ) {
+                        assert( self->loop_thread() != std::this_thread::get_id());
 
-                auto it_inserted = handle_set.insert( p );
+                        return self->new_handle<H>( false, std::forward<Args>( inner_args )... );
+                    }, std::forward<Args>( args )... ).get();
 
-                //On the really.... REALLY off chance there is a collision for a new pointer, just use the old one
-                if( !it_inserted.second ) {
-                    p = std::static_pointer_cast<H>( *it_inserted.first );
+                } else {
+                    std::shared_ptr<H> p = std::make_shared<H>();
+
+                    auto it_inserted = handle_set.insert( p );
+
+                    //There should be no collisions for new pointers, but yeah
+                    assert( it_inserted.second );
+
+                    p->init( this );
+
+                    p->start( std::forward<Args>( args )... );
+
+                    return p;
                 }
-
-                p->init( this );
-
-                p->start( std::forward<Args>( args )... );
-
-                return p;
             }
 
         public:
-            template <typename... Args>
-            inline std::shared_ptr<Idle> idle( Args &&... args ) {
-                assert( std::this_thread::get_id() == this->loop_thread());
-
-                return new_handle<Idle>( std::forward<Args>( args )... );
+            template <typename Functor>
+            inline std::shared_ptr<Idle> idle( Functor f ) {
+                return new_handle<Idle>( true, f );
             }
 
-            template <typename... Args>
-            inline std::shared_ptr<Prepare> prepare( Args &&... args ) {
-                assert( std::this_thread::get_id() == this->loop_thread());
-
-                return new_handle<Prepare>( std::forward<Args>( args )... );
+            template <typename Functor>
+            inline std::shared_ptr<Prepare> prepare( Functor f ) {
+                return new_handle<Prepare>( true, f );
             }
 
-            template <typename... Args>
-            inline std::shared_ptr<Check> check( Args &&... args ) {
-                assert( std::this_thread::get_id() == this->loop_thread());
-
-                return new_handle<Check>( std::forward<Args>( args )... );
+            template <typename Functor>
+            inline std::shared_ptr<Check> check( Functor f ) {
+                return new_handle<Check>( true, f );
             }
 
             template <typename Functor,
@@ -325,9 +331,7 @@ namespace uv {
                                                  const std::chrono::duration<_Rep2, _Period2> &repeat =
                                                  std::chrono::duration<_Rep2, _Period2>(
                                                      std::chrono::duration_values<_Rep2>::zero())) {
-                assert( std::this_thread::get_id() == this->loop_thread());
-
-                return new_handle<Timer>( f, timeout, repeat );
+                return new_handle<Timer>( true, f, timeout, repeat );
             }
 
             template <typename Functor,
@@ -338,9 +342,7 @@ namespace uv {
                                                   const std::chrono::duration<_Rep2, _Period2> &timeout =
                                                   std::chrono::duration<_Rep2, _Period2>(
                                                       std::chrono::duration_values<_Rep2>::zero())) {
-                assert( std::this_thread::get_id() == this->loop_thread());
-
-                return new_handle<Timer>( f, timeout, repeat );
+                return this->timer( f, timeout, repeat );
             }
 
             template <typename Functor,
@@ -386,16 +388,12 @@ namespace uv {
 
             template <typename Functor>
             inline std::shared_ptr<AsyncDetail<Functor>> async( Functor f ) {
-                assert( std::this_thread::get_id() == this->loop_thread());
-
-                return new_handle<AsyncDetail<Functor>>( f );
+                return new_handle<AsyncDetail<Functor>>( true, f );
             }
 
-            template <typename... Args>
-            inline std::shared_ptr<Signal> signal( Args &&... args ) {
-                assert( std::this_thread::get_id() == this->loop_thread());
-
-                return new_handle<Signal>( std::forward<Args>( args )... );
+            template <typename Functor>
+            inline std::shared_ptr<Signal> signal( int signal, Functor f ) {
+                return new_handle<Signal>( true, signal, f );
             }
 
             template <typename Functor, typename... Args>
@@ -430,7 +428,8 @@ namespace uv {
             }
 
             inline std::shared_ptr<Work> work() {
-                return new_handle<Work>();
+                //Work is special since it doesn't initialize on the loop thread
+                return new_handle<Work>( false );
             };
 
             /*
