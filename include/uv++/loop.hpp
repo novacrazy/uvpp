@@ -286,7 +286,7 @@ namespace uv {
                      * Not the best solution, but it just has to wait it's turn I guess. **shrugs**
                      * */
                     return this->schedule( []( Loop *self, Args... inner_args ) {
-                        assert( self->loop_thread() != std::this_thread::get_id());
+                        assert( self->loop_thread() == std::this_thread::get_id());
 
                         return self->new_handle<H>( false, std::forward<Args>( inner_args )... );
                     }, std::forward<Args>( args )... ).get();
