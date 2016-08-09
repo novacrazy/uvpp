@@ -5,6 +5,12 @@
 #ifndef UV_DEFINES_HPP
 #define UV_DEFINES_HPP
 
+#if __cplusplus >= 201500L
+# define UV_HAS_CPP17
+#elif __cplusplus < 201402L
+# error "This library requires C++14 or higher."
+#endif
+
 #include <uv.h>
 #include <fcntl.h>
 #include <cassert>
@@ -23,6 +29,10 @@
 # ifndef UV_LOCKFREE_QUEUE_SIZE
 #  define UV_LOCKFREE_QUEUE_SIZE 128
 # endif
+#endif
+
+#ifndef UV_ASYNC_LAUNCH
+# define UV_ASYNC_LAUNCH ::std::launch::deferred
 #endif
 
 #endif //UV_DEFINES_HPP
