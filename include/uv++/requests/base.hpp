@@ -66,18 +66,6 @@ namespace uv {
             //Implemented in derived classes
             virtual void _init() = 0;
 
-            void init( Loop *p, uv_loop_t *l ) {
-                assert( p != nullptr );
-                assert( l != nullptr );
-
-                this->_parent_loop = p;
-                this->_uv_loop     = l;
-
-                this->handle()->data = &this->internal_data;
-
-                this->_init();
-            }
-
         private:
             typedef typename detail::UserDataAccess<RequestData, R>::handle_t handle_t;
 
@@ -94,8 +82,13 @@ namespace uv {
                 : internal_data( this ), _status( REQUEST_IDLE ) {
             }
 
-            //Implemented in Loop.hpp to pass Loop::handle() to this->init(uv_loop_t*)
-            inline void init( Loop * );
+            inline void init( Loop *l ) {
+                this->_loop_init( l );
+
+                this->handle()->data = &this->internal_data;
+
+                this->_init();
+            }
 
             inline std::shared_future<void> cancel() {
                 if( std::this_thread::get_id() == this->loop_thread()) {

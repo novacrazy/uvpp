@@ -520,25 +520,8 @@ namespace uv {
         return detail::default_loop;
     }
 
-    template <typename H, typename D>
-    inline void HandleBase<H, D>::init( Loop *l ) {
-        assert( l != nullptr );
-
-        this->init( l, l->handle());
-    }
-
-    template <typename H, typename D>
-    inline void Request<H, D>::init( Loop *l ) {
-        assert( l != nullptr );
-
-        this->init( l, l->handle());
-    }
-
-    //TODO: Replace this with something similar to the above init functions
-    void fs::Filesystem::init( Loop *l ) {
-        assert( l != nullptr );
-
-        this->_uv_loop = l->handle();
+    inline void detail::FromLoop::_loop_init( Loop *l ) noexcept {
+        this->_loop_init( l, l->handle());
     }
 
     template <typename H, typename D>

@@ -45,13 +45,9 @@ namespace uv {
 
             virtual void _stop() = 0;
 
-            //Can be called in subclasses
-            void init( Loop *p, uv_loop_t *l ) {
-                assert( p != nullptr );
-                assert( l != nullptr );
-
-                this->_parent_loop = p;
-                this->_uv_loop     = l;
+            //This is just for initializing things in the Loop class
+            inline void init( Loop *l, uv_loop_t *ul ) noexcept {
+                this->_loop_init( l, ul );
 
                 this->handle()->data = &this->internal_data;
 
@@ -62,8 +58,13 @@ namespace uv {
             inline HandleBase() noexcept
                 : internal_data( this ) {}
 
-            //Implemented in Loop.hpp to pass Loop::handle() to this->init(uv_loop_t*)
-            inline void init( Loop * );
+            inline void init( Loop *l ) noexcept {
+                this->_loop_init( l );
+
+                this->handle()->data = &this->internal_data;
+
+                this->_init();
+            }
 
             void stop() {
                 assert( std::this_thread::get_id() == this->loop_thread());
