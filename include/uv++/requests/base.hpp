@@ -33,7 +33,7 @@ namespace uv {
             typedef typename detail::UserDataAccess<RequestData, R>::handle_t request_t;
             typedef D                                                         derived_type;
 
-            enum class request_type : std::underlying_type<uv_req_type>::type {
+            enum class request_kind : std::underlying_type<uv_req_type>::type {
                     UNKNOWN_REQ = 0,
 #define XX( uc, lc ) uc = UV_##uc,
                     UV_REQ_TYPE_MAP( XX )
@@ -159,8 +159,8 @@ namespace uv {
             }
 
             std::string name() const noexcept {
-                switch((request_type)this->request()->type ) {
-#define XX( uc, lc ) case request_type::uc: return #uc;
+                switch((request_kind)this->request()->type ) {
+#define XX( uc, lc ) case request_kind::uc: return #uc;
                     UV_REQ_TYPE_MAP( XX )
                     XX( ACCEPT, accept )
                     XX( FS_EVENT_REQ, fs_event_req )

@@ -82,7 +82,7 @@ namespace uv {
             typedef typename HandleBase<H, D>::handle_t     handle_t;
             typedef typename HandleBase<H, D>::derived_type derived_type;
 
-            enum class handle_type : std::underlying_type<uv_handle_type>::type {
+            enum class handle_kind : std::underlying_type<uv_handle_type>::type {
                     UNKNOWN_HANDLE = 0,
 #define XX( uc, lc ) uc = UV_##uc,
                     UV_HANDLE_TYPE_MAP( XX )
@@ -120,13 +120,13 @@ namespace uv {
             template <typename Functor>
             std::shared_future<void> close( Functor );
 
-            inline handle_type guess_handle() const noexcept {
-                return (handle_type)uv_guess_handle( this->handle()->type );
+            inline handle_kind guess_handle_kind() const noexcept {
+                return (handle_kind)uv_guess_handle( this->handle()->type );
             }
 
             std::string name() const noexcept {
-                switch((handle_type)this->handle()->type ) {
-#define XX( uc, lc ) case handle_type::uc: return #uc;
+                switch((handle_kind)this->handle()->type ) {
+#define XX( uc, lc ) case handle_kind::uc: return #uc;
                     UV_HANDLE_TYPE_MAP( XX )
                     XX( FILE, file )
                     XX( HANDLE_TYPE_MAX, handle_type_max )
@@ -136,7 +136,7 @@ namespace uv {
             }
 
             std::string guess_handle_name() const noexcept {
-                switch( this->guess_handle()) {
+                switch( this->guess_handle_kind()) {
                     UV_HANDLE_TYPE_MAP( XX )
                     XX( FILE, file )
                     XX( HANDLE_TYPE_MAX, handle_type_max )
