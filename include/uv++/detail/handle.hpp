@@ -34,7 +34,7 @@ namespace uv {
             inline Continuation( Functor _f ) noexcept : f( _f ) {}
 
             template <typename... Args>
-            inline decltype( auto ) dispatch( Self *self, Args... args ) {
+            inline UV_DECLTYPE_AUTO dispatch( Self *self, Args... args ) {
                 return this->f( self, std::forward<Args>( args )... );
             }
         };
@@ -48,7 +48,7 @@ namespace uv {
             inline Continuation( Functor _f ) noexcept : f( _f ) {}
 
             template <typename... Args>
-            inline decltype( auto ) dispatch( Self *self, Args... args ) {
+            inline UV_DECLTYPE_AUTO dispatch( Self *self, Args... args ) {
                 return this->f( std::forward<Args>( args )... );
             }
         };

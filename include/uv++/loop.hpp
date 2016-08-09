@@ -60,7 +60,7 @@ namespace uv {
 
             std::shared_ptr<fs::Filesystem> _fs;
 
-            std::atomic_bool stopped;
+            std::atomic_bool stopped, has_ran;
 
             typedef std::unordered_set<std::shared_ptr<void>>         handle_set_type;
             handle_set_type                                           handle_set;
@@ -149,6 +149,8 @@ namespace uv {
                 this->stopped = false;
 
                 this->_loop_thread = std::this_thread::get_id();
+
+                this->has_ran = true;
 
                 return uv_run( handle(), (uv_run_mode)( mode ));
             }
@@ -279,7 +281,7 @@ namespace uv {
             std::shared_ptr<H> new_handle( bool requires_loop_thread, Args... args ) {
                 std::lock_guard<std::mutex> lock( this->handle_set_mutex );
 
-                if( requires_loop_thread && this->loop_thread() != std::this_thread::get_id()) {
+                if( this->has_ran && requires_loop_thread && this->loop_thread() != std::this_thread::get_id()) {
                     /*
                      * If the new_handle request is not on the loop thread, block until everything is initialized there
                      *
@@ -397,7 +399,7 @@ namespace uv {
             }
 
             template <typename Functor, typename... Args>
-            decltype( auto ) schedule( Functor f, Args... args ) {
+            UV_DECLTYPE_AUTO schedule( Functor f, Args... args ) {
                 typedef detail::AsyncContinuation<Functor, Loop> Cont;
 
                 Cont *c = new Cont( f );
@@ -587,11 +589,9 @@ namespace uv {
         }
     }
 
-    namespace detail {
-        template <typename... Args>
-        inline decltype( auto ) schedule( Loop *l, Args... args ) {
-            return l->schedule( std::forward<Args>( args )... );
-        }
+    template <typename... Args>
+    inline UV_DECLTYPE_AUTO schedule( Loop *l, Args... args ) {
+        return l->schedule( std::forward<Args>( args )... );
     }
 }
 

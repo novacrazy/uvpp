@@ -50,12 +50,12 @@ namespace uv {
         };
 
         template <typename Functor, typename T, std::size_t... S>
-        inline decltype( auto ) invoke_helper( Functor &&func, T &&t, std::index_sequence<S...> ) {
+        inline UV_DECLTYPE_AUTO invoke_helper( Functor &&func, T &&t, std::index_sequence<S...> ) {
             return func( std::get<S>( std::forward<T>( t ))... );
         }
 
         template <typename Functor, typename T>
-        inline decltype( auto ) invoke( Functor &&func, T &&t ) {
+        inline UV_DECLTYPE_AUTO invoke( Functor &&func, T &&t ) {
             constexpr auto Size = std::tuple_size<typename std::decay<T>::type>::value;
 
             return invoke_helper( std::forward<Functor>( func ),
@@ -142,30 +142,30 @@ namespace uv {
             constexpr launch default_policy = launch::deferred | launch::async;
 
             template <typename T, typename Functor>
-            decltype( auto ) then( future<T> &, Functor, launch = default_policy );
+            UV_DECLTYPE_AUTO then( future<T> &, Functor, launch = default_policy );
 
             template <typename T, typename Functor>
-            decltype( auto ) then( shared_future<T>, Functor, launch = default_policy );
+            UV_DECLTYPE_AUTO then( shared_future<T>, Functor, launch = default_policy );
 
             template <typename T, typename Functor>
-            decltype( auto ) then( future<T> &&, Functor, launch = default_policy );
+            UV_DECLTYPE_AUTO then( future<T> &&, Functor, launch = default_policy );
 
             template <typename T, typename Functor>
-            decltype( auto ) then( promise<T> &, Functor, launch = default_policy );
+            UV_DECLTYPE_AUTO then( promise<T> &, Functor, launch = default_policy );
 
             template <typename... Args>
-            inline decltype( auto ) waterfall( Args... );
+            inline UV_DECLTYPE_AUTO waterfall( Args... );
 
             template <typename K>
             struct recursive_get {
-                inline static decltype( auto ) get( future<K> &&k ) {
+                inline static UV_DECLTYPE_AUTO get( future<K> &&k ) {
                     return k.get();
                 }
             };
 
             template <typename P>
             struct recursive_get<future<P>> {
-                inline static decltype( auto ) get( future<future<P>> &&k ) {
+                inline static UV_DECLTYPE_AUTO get( future<future<P>> &&k ) {
                     return recursive_get<P>::get( k.get());
                 }
             };
@@ -173,7 +173,7 @@ namespace uv {
             template <typename Functor, typename R = result_of<Functor>>
             struct then_invoke_helper {
                 template <typename... Args>
-                inline static decltype( auto ) invoke( Functor f, Args... args ) {
+                inline static UV_DECLTYPE_AUTO invoke( Functor f, Args... args ) {
                     return f( forward<Args>( args )... );
                 }
             };
@@ -181,7 +181,7 @@ namespace uv {
             template <typename Functor, typename K>
             struct then_invoke_helper<Functor, future<K>> {
                 template <typename... Args>
-                inline static decltype( auto ) invoke( Functor f, Args... args ) {
+                inline static UV_DECLTYPE_AUTO invoke( Functor f, Args... args ) {
                     return recursive_get<K>::get( f( forward<Args>( args )... ));
                 }
             };
@@ -189,31 +189,31 @@ namespace uv {
             template <typename Functor, typename K>
             struct then_invoke_helper<Functor, shared_future<K>> {
                 template <typename... Args>
-                inline static decltype( auto ) invoke( Functor f, Args... args ) {
+                inline static UV_DECLTYPE_AUTO invoke( Functor f, Args... args ) {
                     return f( forward<Args>( args )... ).get();
                 }
             };
 
             template <typename T, typename Functor>
             struct then_helper {
-                inline static decltype( auto ) dispatch( launch policy, future<T> &&s, Functor f ) {
+                inline static UV_DECLTYPE_AUTO dispatch( launch policy, future<T> &&s, Functor f ) {
                     return then_invoke_helper<Functor>::invoke( f, recursive_get<T>::get( move( s )));
                 }
 
-                inline static decltype( auto ) dispatch( launch policy, shared_future<T> s, Functor f ) {
+                inline static UV_DECLTYPE_AUTO dispatch( launch policy, shared_future<T> s, Functor f ) {
                     return then_invoke_helper<Functor>::invoke( f, s.get());
                 }
             };
 
             template <typename Functor>
             struct then_helper<void, Functor> {
-                inline static decltype( auto ) dispatch( launch policy, future<void> &&s, Functor f ) {
+                inline static UV_DECLTYPE_AUTO dispatch( launch policy, future<void> &&s, Functor f ) {
                     s.get();
 
                     return then_invoke_helper<Functor>::invoke( f );
                 }
 
-                inline static decltype( auto ) dispatch( launch policy, shared_future<void> s, Functor f ) {
+                inline static UV_DECLTYPE_AUTO dispatch( launch policy, shared_future<void> s, Functor f ) {
                     s.get();
 
                     return then_invoke_helper<Functor>::invoke( f );
@@ -221,48 +221,48 @@ namespace uv {
             };
 
             template <typename T, typename Functor>
-            inline decltype( auto ) then( future<T> &&s, Functor f, launch policy ) {
+            inline UV_DECLTYPE_AUTO then( future<T> &&s, Functor f, launch policy ) {
                 return async( policy, [policy]( future <T> &&s2, Functor f2 ) {
                     return then_helper<T, Functor>::dispatch( policy, move( s2 ), f2 );
                 }, move( s ), f );
             };
 
             template <typename T, typename Functor>
-            inline decltype( auto ) then( future<T> &s, Functor f, launch policy ) {
+            inline UV_DECLTYPE_AUTO then( future<T> &s, Functor f, launch policy ) {
                 return then( move( s ), f, policy );
             };
 
             template <typename T, typename Functor>
-            inline decltype( auto ) then( shared_future<T> s, Functor f, launch policy ) {
+            inline UV_DECLTYPE_AUTO then( shared_future<T> s, Functor f, launch policy ) {
                 return async( policy, [policy, s, f]() {
                     return then_helper<T, Functor>::dispatch( policy, s, f );
                 } );
             };
 
             template <typename T, typename Functor>
-            inline decltype( auto ) then( promise<T> &s, Functor f, launch policy ) {
+            inline UV_DECLTYPE_AUTO then( promise<T> &s, Functor f, launch policy ) {
                 return then( s.get_future(), f, policy );
             };
 
             /*
-            inline decltype( auto ) waterfall_helper() {
+            inline UV_DECLTYPE_AUTO waterfall_helper() {
                 return void();
             };
 
             template <typename Functor, typename... Args>
-            inline decltype( auto ) waterfall_helper( launch policy, Functor f, Args... args ) {
+            inline UV_DECLTYPE_AUTO waterfall_helper( launch policy, Functor f, Args... args ) {
                 return async( policy, [policy, f]( Args... inner_args ) {
 
                 }, std::forward<Args>( args )... );
             };
 
             template <typename Functor, typename... Args>
-            inline decltype( auto ) waterfall_helper( Functor f, Args... args ) {
+            inline UV_DECLTYPE_AUTO waterfall_helper( Functor f, Args... args ) {
                 return waterfall_helper( default_policy, f, std::forward<Args>( args )... );
             };
 
             template <typename... Args>
-            inline decltype( auto ) waterfall( Args... args ) {
+            inline UV_DECLTYPE_AUTO waterfall( Args... args ) {
                 return waterfall_helper( std::forward<Args>( args )... );
             }
              */

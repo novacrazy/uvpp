@@ -141,7 +141,7 @@ namespace uv {
 
                     if( last_status != REQUEST_PENDING ) {
                         if( std::this_thread::get_id() != this->loop_thread()) {
-                            detail::schedule( this->loop(), [this] {
+                            schedule( this->loop(), [this] {
                                 this->do_queue<Cont>();
                             } );
 

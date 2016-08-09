@@ -35,4 +35,10 @@
 # define UV_ASYNC_LAUNCH ::std::launch::deferred
 #endif
 
+#ifdef UV_DOXYGEN
+# define UV_DECLTYPE_AUTO auto
+#else
+# define UV_DECLTYPE_AUTO decltype(auto)
+#endif
+
 #endif //UV_DEFINES_HPP

@@ -116,7 +116,7 @@ namespace uv {
                     }
 
                 } else {
-                    return detail::schedule( this->loop(), [this] {
+                    return schedule( this->loop(), [this] {
                         return this->cancel().get();
                     } );
                 }

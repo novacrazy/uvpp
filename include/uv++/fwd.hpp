@@ -64,6 +64,9 @@ namespace uv {
     namespace net {
         struct interface_t;
     }
+
+    template <typename... Args>
+    inline UV_DECLTYPE_AUTO schedule( Loop *, Args... );
 }
 
 #endif //UV_FWD_HPP

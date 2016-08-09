@@ -10,9 +10,6 @@
 
 namespace uv {
     namespace detail {
-        template <typename... Args>
-        inline decltype( auto ) schedule( Loop *, Args... );
-
         template <typename R>
         struct dispatch_helper {
             template <typename Functor, typename... Args>
