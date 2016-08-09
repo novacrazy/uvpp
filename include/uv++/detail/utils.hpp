@@ -16,17 +16,17 @@ namespace uv {
          * */
 
         template <typename T, typename K>
-        inline bool is_any( T val, K val2 ) {
+        inline bool is_any( T val, K val2 ) noexcept {
             return val == val2;
         }
 
         template <typename T, typename K, typename... Args>
-        inline bool is_any( T val, K val2, Args... args ) {
+        inline bool is_any( T val, K val2, Args... args ) noexcept {
             return is_any( val, val2 ) || is_any( val, args... );
         }
 
         template <typename T>
-        inline bool is_any( T ) {
+        inline bool is_any( T ) noexcept {
             return false;
         }
 
@@ -64,20 +64,20 @@ namespace uv {
         }
 
         template <typename T>
-        inline std::future<T> make_ready_future( T &&t ) {
+        inline std::future<T> make_ready_future( T &&t ) noexcept {
             std::promise<T> p;
             p.set_value( t );
             return p.get_future();
         }
 
-        inline std::future<void> make_ready_future( void ) {
+        inline std::future<void> make_ready_future( void ) noexcept {
             std::promise<void> p;
             p.set_value();
             return p.get_future();
         }
 
         template <typename T, typename E>
-        inline std::future<T> make_exception_future( E e ) {
+        inline std::future<T> make_exception_future( E e ) noexcept {
             std::promise<T> p;
             p.set_exception( std::make_exception_ptr( e ));
             return p.get_future();
@@ -95,7 +95,7 @@ namespace uv {
             std::promise<void>       p;
             std::shared_future<void> s;
 
-            LazyStatic()
+            LazyStatic() noexcept
                 : p(), s( p.get_future()) {
             }
 
@@ -125,14 +125,14 @@ namespace uv {
         };
 
         template <class T, class Compare>
-        inline const T &clamp( const T &v, const T &lo, const T &hi, Compare comp ) {
+        inline const T &clamp( const T &v, const T &lo, const T &hi, Compare comp ) noexcept {
             assert( !comp( hi, lo ));
 
             return comp( v, lo ) ? lo : comp( hi, v ) ? hi : v;
         }
 
         template <class T>
-        inline const T &clamp( const T &v, const T &lo, const T &hi ) {
+        inline const T &clamp( const T &v, const T &lo, const T &hi ) noexcept {
             return clamp( v, lo, hi, std::less<>());
         }
 
@@ -243,6 +243,29 @@ namespace uv {
             inline decltype( auto ) then( promise<T> &s, Functor f, launch policy ) {
                 return then( s.get_future(), f, policy );
             };
+
+            /*
+            inline decltype( auto ) waterfall_helper() {
+                return void();
+            };
+
+            template <typename Functor, typename... Args>
+            inline decltype( auto ) waterfall_helper( launch policy, Functor f, Args... args ) {
+                return async( policy, [policy, f]( Args... inner_args ) {
+
+                }, std::forward<Args>( args )... );
+            };
+
+            template <typename Functor, typename... Args>
+            inline decltype( auto ) waterfall_helper( Functor f, Args... args ) {
+                return waterfall_helper( default_policy, f, std::forward<Args>( args )... );
+            };
+
+            template <typename... Args>
+            inline decltype( auto ) waterfall( Args... args ) {
+                return waterfall_helper( std::forward<Args>( args )... );
+            }
+             */
         }
     }
 

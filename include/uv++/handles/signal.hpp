@@ -14,11 +14,11 @@ namespace uv {
             typedef typename Handle<uv_signal_t, Signal>::handle_t handle_t;
 
         protected:
-            void _init() {
+            void _init() noexcept {
                 uv_signal_init( this->_uv_loop, &_handle );
             }
 
-            void _stop() {
+            void _stop() noexcept {
                 uv_signal_stop( &_handle );
             }
 
@@ -38,7 +38,7 @@ namespace uv {
                 }, signum );
             }
 
-            std::string signame() const {
+            std::string signame() const noexcept {
                 return detail::signame( this->handle()->signum );
             }
     };

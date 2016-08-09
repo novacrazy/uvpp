@@ -13,9 +13,9 @@ namespace uv {
             const char *__what;
 
         public:
-            inline Exception( const char *w ) : __what( w ) {}
+            inline Exception( const char *w ) noexcept : __what( w ) {}
 
-            inline Exception( int e ) : Exception( uv_strerror( e )) {}
+            inline Exception( int e ) noexcept : Exception( uv_strerror( e )) {}
 
             inline const char *what() const noexcept {
                 return this->__what;

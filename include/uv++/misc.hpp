@@ -11,7 +11,7 @@
 
 namespace uv {
     //I would still recommend the stuff in <chrono> though
-    inline uint64_t hrtime() {
+    inline uint64_t hrtime() noexcept {
         return uv_hrtime();
     }
 }

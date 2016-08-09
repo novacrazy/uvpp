@@ -17,13 +17,13 @@ namespace uv {
                 Loop      *_parent_loop;
 
             public:
-                std::thread::id loop_thread() const;
+                std::thread::id loop_thread() const noexcept;
 
-                inline Loop *loop() {
+                inline Loop *loop() noexcept {
                     return this->_parent_loop;
                 }
 
-                inline Loop const *loop() const {
+                inline Loop const *loop() const noexcept {
                     return this->_parent_loop;
                 }
         };

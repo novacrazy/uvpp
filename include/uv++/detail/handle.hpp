@@ -5,6 +5,7 @@
 #ifndef UV_HANDLE_DETAIL_HPP
 #define UV_HANDLE_DETAIL_HPP
 
+#include "base.hpp"
 #include "type_traits.hpp"
 #include "function_traits.hpp"
 
@@ -30,7 +31,7 @@ namespace uv {
 
             Functor f;
 
-            inline Continuation( Functor _f ) : f( _f ) {}
+            inline Continuation( Functor _f ) noexcept : f( _f ) {}
 
             template <typename... Args>
             inline decltype( auto ) dispatch( Self *self, Args... args ) {
@@ -44,7 +45,7 @@ namespace uv {
 
             Functor f;
 
-            inline Continuation( Functor _f ) : f( _f ) {}
+            inline Continuation( Functor _f ) noexcept : f( _f ) {}
 
             template <typename... Args>
             inline decltype( auto ) dispatch( Self *self, Args... args ) {
@@ -67,7 +68,7 @@ namespace uv {
          *
          * If I'm missing any, feel free to open a pull request or just an issue.
          * */
-        std::string signame( int signum ) {
+        std::string signame( int signum ) noexcept {
 #ifdef UV_NO_HAS_STRSIGNAL
             const char *signame;
             switch( signum ) {

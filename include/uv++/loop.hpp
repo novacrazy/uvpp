@@ -115,11 +115,11 @@ namespace uv {
             }
 
         public:
-            inline const handle_t *handle() const {
+            inline const handle_t *handle() const noexcept {
                 return _uv_loop;
             }
 
-            inline handle_t *handle() {
+            inline handle_t *handle() noexcept {
                 return _uv_loop;
             }
 
@@ -141,11 +141,11 @@ namespace uv {
                 this->init( this, l );
             }
 
-            inline std::shared_ptr<fs::Filesystem> fs() {
+            inline std::shared_ptr<fs::Filesystem> fs() noexcept {
                 return _fs;
             }
 
-            inline int run( run_mode mode = RUN_DEFAULT ) {
+            inline int run( run_mode mode = RUN_DEFAULT ) noexcept {
                 this->stopped = false;
 
                 this->_loop_thread = std::this_thread::get_id();
@@ -154,7 +154,8 @@ namespace uv {
             }
 
             template <typename _Rep, typename _Period>
-            void run_forever( const std::chrono::duration<_Rep, _Period> &delay, run_mode mode = RUN_DEFAULT ) {
+            void
+            run_forever( const std::chrono::duration<_Rep, _Period> &delay, run_mode mode = RUN_DEFAULT ) noexcept {
                 this->stopped = false;
 
 #ifdef UV_DETRACT_LOOP
@@ -194,13 +195,13 @@ namespace uv {
 #endif
             }
 
-            inline void run_forever( run_mode mode = RUN_DEFAULT ) {
+            inline void run_forever( run_mode mode = RUN_DEFAULT ) noexcept {
                 using namespace std::chrono_literals;
 
                 this->run_forever( UV_DEFAULT_LOOP_SLEEP, mode );
             }
 
-            inline void start( run_mode mode = RUN_DEFAULT ) {
+            inline void start( run_mode mode = RUN_DEFAULT ) noexcept {
                 this->run_forever( mode );
             }
 
@@ -218,32 +219,32 @@ namespace uv {
                 return *this;
             }
 
-            inline static size_t size() {
+            inline static size_t size() noexcept {
                 return uv_loop_size();
             }
 
-            inline int backend_fd() const {
+            inline int backend_fd() const noexcept {
                 assert( std::this_thread::get_id() == this->loop_thread());
 
                 return uv_backend_fd( handle());
             }
 
-            inline int backend_timeout() const {
+            inline int backend_timeout() const noexcept {
                 assert( std::this_thread::get_id() == this->loop_thread());
 
                 return uv_backend_timeout( handle());
             }
 
-            inline uint64_t now() const {
+            inline uint64_t now() const noexcept {
                 return uv_now( handle());
             }
 
-            inline void update_time() {
+            inline void update_time() noexcept {
                 uv_update_time( handle());
             }
 
             //returns true on closed
-            inline bool try_close( int *resptr = nullptr ) {
+            inline bool try_close( int *resptr = nullptr ) noexcept {
                 assert( std::this_thread::get_id() == this->loop_thread());
 
                 int res = uv_loop_close( this->handle());
@@ -438,7 +439,7 @@ namespace uv {
              * Most of it is partially copied from src/uv-common.(h|c) and src/queue.h
              * */
             template <typename _Char = char>
-            void print_handles( std::basic_ostream<_Char> &out, bool only_active = false ) const {
+            void print_handles( std::basic_ostream<_Char> &out, bool only_active = false ) const noexcept {
                 typedef void *UV_QUEUE[2];
 
                 assert( std::this_thread::get_id() == this->loop_thread());
@@ -500,6 +501,10 @@ namespace uv {
             }
     };
 
+    inline std::thread::id detail::FromLoop::loop_thread() const noexcept {
+        return this->loop()->_loop_thread;
+    };
+
     namespace detail {
         struct DefaultLoop : LazyStatic<std::shared_ptr<Loop>> {
             std::shared_ptr<Loop> init() {
@@ -534,21 +539,6 @@ namespace uv {
 
         this->_uv_loop = l->handle();
     }
-
-    namespace detail {
-        template <typename Functor, typename Self>
-        struct CloseHelperContinuation : public Continuation<Functor, Self> {
-            inline CloseHelperContinuation( Functor f )
-                : Continuation<Functor, Self>( f ) {
-            }
-
-            std::promise<void> result;
-        };
-    }
-
-    inline std::thread::id detail::FromLoop::loop_thread() const {
-        return this->loop()->_loop_thread;
-    };
 
     template <typename H, typename D>
     template <typename Functor>
@@ -609,7 +599,7 @@ namespace uv {
 #ifdef UV_OVERLOAD_OSTREAM
 
 template <typename _Char>
-inline std::basic_ostream<_Char> &operator<<( std::basic_ostream<_Char> &out, const uv::Loop &loop ) {
+inline std::basic_ostream<_Char> &operator<<( std::basic_ostream<_Char> &out, const uv::Loop &loop ) noexcept {
     loop.print_handles<_Char>( out, false );
 
     return out;

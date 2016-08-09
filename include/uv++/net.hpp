@@ -31,7 +31,7 @@ namespace uv {
             address_t address;
             netmask_t netmask;
 
-            interface_t( const uv_interface_address_t &a )
+            interface_t( const uv_interface_address_t &a ) noexcept
                 : name( a.name ),
                   is_internal( a.is_internal ),
                   address( a.address ),
@@ -39,27 +39,39 @@ namespace uv {
                 std::copy( &a.phys_addr[0], &a.phys_addr[phys_addr.size()], phys_addr.begin());
             }
 
+            interface_t( const interface_t & ) noexcept = default;
+
+            interface_t( interface_t && ) noexcept = default;
+
             inline std::string ipv4_address() const {
                 char buffer[INET_ADDRSTRLEN] = { 0 };
 
-                uv_ip4_name( &this->address.address4, buffer, sizeof( buffer ));
+                int res = uv_ip4_name( &this->address.address4, buffer, sizeof( buffer ));
+
+                if( res != 0 ) {
+                    throw ::uv::Exception( res );
+                }
 
                 return std::string( buffer );
             }
 
-            inline bool is_ipv4_address() const {
+            inline bool is_ipv4_address() const noexcept {
                 return this->address.address4.sin_family == AF_INET;
             }
 
             inline std::string ipv6_address() const {
                 char buffer[INET6_ADDRSTRLEN] = { 0 };
 
-                uv_ip6_name( &this->address.address6, buffer, sizeof( buffer ));
+                int res = uv_ip6_name( &this->address.address6, buffer, sizeof( buffer ));
+
+                if( res != 0 ) {
+                    throw ::uv::Exception( res );
+                }
 
                 return std::string( buffer );
             }
 
-            inline bool is_ipv6_address() const {
+            inline bool is_ipv6_address() const noexcept {
                 return this->address.address4.sin_family == AF_INET6;
             }
 

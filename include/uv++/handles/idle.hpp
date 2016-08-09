@@ -13,11 +13,11 @@ namespace uv {
             typedef typename Handle<uv_idle_t, Idle>::handle_t handle_t;
 
         protected:
-            inline void _init() {
+            inline void _init() noexcept {
                 uv_idle_init( this->_uv_loop, &_handle );
             }
 
-            inline void _stop() {
+            inline void _stop() noexcept {
                 uv_idle_stop( &_handle );
             }
 

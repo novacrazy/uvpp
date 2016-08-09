@@ -15,7 +15,7 @@ namespace uv {
     namespace detail {
         template <typename Functor, typename Self>
         struct WorkContinuation : public AsyncContinuation<Functor, Self> {
-            WorkContinuation( Functor f )
+            WorkContinuation( Functor f ) noexcept
                 : AsyncContinuation<Functor, Self>( f ) {
             }
 
@@ -28,7 +28,7 @@ namespace uv {
 
 
         struct NumWorkers : LazyStatic<size_t> {
-            size_t init() {
+            size_t init() noexcept {
                 const char *val = std::getenv( "UV_THREADPOOL_SIZE" );
 
                 /*
@@ -51,11 +51,11 @@ namespace uv {
             typedef typename Request<uv_work_t, Work>::request_t request_t;
 
         protected:
-            inline void _init() {
+            inline void _init() noexcept {
                 //No-op
             }
 
-            inline void _stop() {
+            inline void _stop() noexcept {
                 this->cancel();
             }
 
@@ -71,7 +71,7 @@ namespace uv {
 
                     self->_status.compare_exchange_strong( expect_pending, REQUEST_ACTIVE );
 
-                    if( expect_pending == Work::REQUEST_PENDING ) {
+                    if( expect_pending == REQUEST_PENDING ) {
                         Cont *sc = static_cast<Cont *>(d->continuation.get());
 
                         sc->dispatch();
@@ -102,13 +102,13 @@ namespace uv {
             }
 
         public:
-            static size_t num_workers() {
+            static size_t num_workers() noexcept {
                 static detail::NumWorkers num;
 
                 return num;
             }
 
-            inline void start() {
+            inline void start() noexcept {
                 //No-op
             }
 
@@ -153,7 +153,7 @@ namespace uv {
                     auto result = c->s;
 
                     //I love this line. So succinct.
-                    return util::then( c->finished, [result] { return *result; }, std::launch::deferred );
+                    return util::then( c->finished, [result] { return *result; }, UV_ASYNC_LAUNCH );
                 }
             }
 

@@ -28,11 +28,15 @@ namespace uv {
             int                           speed;
             uv_cpu_info_t::uv_cpu_times_s cpu_times;
 
-            cpu_info_t( const uv_cpu_info_t &c )
+            cpu_info_t( const uv_cpu_info_t &c ) noexcept
                 : model( c.model ),
                   speed( c.speed ),
                   cpu_times( c.cpu_times ) {
             }
+
+            cpu_info_t( const cpu_info_t & )noexcept = default;
+
+            cpu_info_t( cpu_info_t && ) noexcept = default;
         };
 
         struct passwd_t {
@@ -42,7 +46,7 @@ namespace uv {
             std::string shell;
             std::string homedir;
 
-            passwd_t( const uv_passwd_t &psw )
+            passwd_t( const uv_passwd_t &psw ) noexcept
                 : username( psw.username ),
                   uid( psw.uid ),
                   gid( psw.gid ),
@@ -51,9 +55,13 @@ namespace uv {
                     this->shell = psw.shell;
                 }
             }
+
+            passwd_t( const passwd_t & ) noexcept = default;
+
+            passwd_t( passwd_t && ) noexcept = default;
         };
 
-        inline char **setup_args( int argc, char **argv ) {
+        inline char **setup_args( int argc, char **argv ) noexcept {
             assert( argv != nullptr );
 
             return uv_setup_args( argc, argv );

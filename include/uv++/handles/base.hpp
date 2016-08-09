@@ -5,8 +5,6 @@
 #ifndef UV_BASE_HANDLE_HPP
 #define UV_BASE_HANDLE_HPP
 
-#include "../detail/base.hpp"
-
 #include "../detail/data.hpp"
 
 #include "../exception.hpp"
@@ -25,7 +23,7 @@ namespace uv {
 
         void *self;
 
-        HandleData( void *s )
+        HandleData( void *s ) noexcept
             : self( s ) {
             assert( s != nullptr );
         }
@@ -53,7 +51,7 @@ namespace uv {
                 assert( l != nullptr );
 
                 this->_parent_loop = p;
-                this->_uv_loop        = l;
+                this->_uv_loop     = l;
 
                 this->handle()->data = &this->internal_data;
 
@@ -61,7 +59,8 @@ namespace uv {
             }
 
         public:
-            inline HandleBase() : internal_data( this ) {}
+            inline HandleBase() noexcept
+                : internal_data( this ) {}
 
             //Implemented in Loop.hpp to pass Loop::handle() to this->init(uv_loop_t*)
             inline void init( Loop * );
@@ -98,34 +97,34 @@ namespace uv {
             std::atomic_bool closing;
 
         public:
-            inline const handle_t *handle() const {
+            inline const handle_t *handle() const noexcept {
                 return &_handle;
             }
 
-            inline handle_t *handle() {
+            inline handle_t *handle() noexcept {
                 return &_handle;
             }
 
-            inline bool is_active() const {
+            inline bool is_active() const noexcept {
                 return !this->closing && uv_is_active((uv_handle_t *)( this->handle())) != 0;
             }
 
-            inline bool is_closing() const {
+            inline bool is_closing() const noexcept {
                 return this->closing || uv_is_closing((uv_handle_t *)( this->handle())) != 0;
             }
 
-            inline size_t size() {
+            inline size_t size() noexcept {
                 return uv_handle_size( this->handle()->type );
             }
 
             template <typename Functor>
             std::shared_future<void> close( Functor );
 
-            inline handle_type guess_handle() const {
+            inline handle_type guess_handle() const noexcept {
                 return (handle_type)uv_guess_handle( this->handle()->type );
             }
 
-            std::string name() const {
+            std::string name() const noexcept {
                 switch((handle_type)this->handle()->type ) {
 #define XX( uc, lc ) case handle_type::uc: return #uc;
                     UV_HANDLE_TYPE_MAP( XX )
@@ -136,7 +135,7 @@ namespace uv {
                 }
             }
 
-            std::string guess_handle_name() const {
+            std::string guess_handle_name() const noexcept {
                 switch( this->guess_handle()) {
                     UV_HANDLE_TYPE_MAP( XX )
                     XX( FILE, file )
@@ -161,7 +160,7 @@ namespace uv {
         typedef HandleBase<typename D::handle_t, D> *argument_type;
         typedef std::size_t                         result_type;
 
-        result_type operator()( argument_type const &h ) const {
+        result_type operator()( argument_type const &h ) const noexcept {
             return reinterpret_cast<size_t>(h->handle());
         }
     };

@@ -16,7 +16,7 @@ namespace uv {
         template <typename R>
         struct dispatch_helper {
             template <typename Functor, typename... Args>
-            static inline void dispatch( std::promise<R> &result, Functor f, std::tuple<Args...> &&args ) {
+            static inline void dispatch( std::promise<R> &result, Functor f, std::tuple<Args...> &&args ) noexcept {
                 try {
                     result.set_value( invoke( f, args ));
 
@@ -29,7 +29,7 @@ namespace uv {
         template <>
         struct dispatch_helper<void> {
             template <typename Functor, typename... Args>
-            static inline void dispatch( std::promise<void> &result, Functor f, std::tuple<Args...> &&args ) {
+            static inline void dispatch( std::promise<void> &result, Functor f, std::tuple<Args...> &&args ) noexcept {
                 try {
                     invoke( f, args );
 
@@ -49,7 +49,7 @@ namespace uv {
             std::shared_ptr<std::promise<result_type>>       r;
             std::shared_ptr<std::shared_future<result_type>> s;
 
-            inline AsyncContinuationBase( Functor f )
+            inline AsyncContinuationBase( Functor f ) noexcept
                 : Continuation<Functor, Self>( f ) {
             }
 
@@ -70,7 +70,7 @@ namespace uv {
 
             typedef ContinuationNeedsSelf<Functor, Self> needs_self;
 
-            inline AsyncContinuation( Functor f )
+            inline AsyncContinuation( Functor f ) noexcept
                 : AsyncContinuationBase<Functor, Self>( f ) {
             }
 
@@ -130,7 +130,7 @@ namespace uv {
 
             typedef ContinuationNeedsSelf<Functor, Self> needs_self;
 
-            inline AsyncContinuation( Functor f )
+            inline AsyncContinuation( Functor f ) noexcept
                 : AsyncContinuationBase<Functor, Self>( f ) {
             }
 

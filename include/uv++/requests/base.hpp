@@ -6,12 +6,12 @@
 #define UV_BASE_REQUEST_HPP
 
 
-#include "../detail/base.hpp"
-
 #include "../exception.hpp"
+#include "../detail/async.hpp"
 
-#include "../detail/type_traits.hpp"
 #include "../detail/data.hpp"
+
+#include <atomic>
 
 namespace uv {
     struct RequestData : detail::UserData {
@@ -81,16 +81,18 @@ namespace uv {
         private:
             typedef typename detail::UserDataAccess<RequestData, R>::handle_t handle_t;
 
-            inline const handle_t *handle() const {
+            inline const handle_t *handle() const noexcept {
                 return this->request();
             }
 
-            inline handle_t *handle() {
+            inline handle_t *handle() noexcept {
                 return this->request();
             }
 
         public:
-            inline Request() : internal_data( this ), _status( REQUEST_IDLE ) {}
+            inline Request() noexcept
+                : internal_data( this ), _status( REQUEST_IDLE ) {
+            }
 
             //Implemented in Loop.hpp to pass Loop::handle() to this->init(uv_loop_t*)
             inline void init( Loop * );
@@ -120,43 +122,43 @@ namespace uv {
                 }
             }
 
-            inline int status() const {
+            inline int status() const noexcept {
                 return this->_status;
             }
 
-            inline bool is_pending() const {
+            inline bool is_pending() const noexcept {
                 return this->_status == REQUEST_PENDING;
             }
 
-            inline bool is_idle() const {
+            inline bool is_idle() const noexcept {
                 return this->_status == REQUEST_IDLE;
             }
 
-            inline bool is_cancelled() const {
+            inline bool is_cancelled() const noexcept {
                 return this->_status == REQUEST_CANCELLED;
             }
 
-            inline bool is_active() const {
+            inline bool is_active() const noexcept {
                 return this->_status == REQUEST_ACTIVE;
             }
 
-            inline bool is_finished() const {
+            inline bool is_finished() const noexcept {
                 return this->_status == REQUEST_FINISHED;
             }
 
-            inline size_t size() {
+            inline size_t size() noexcept {
                 return uv_req_size( this->request()->type );
             }
 
-            inline const request_t *request() const {
+            inline const request_t *request() const noexcept {
                 return &_request;
             }
 
-            inline request_t *request() {
+            inline request_t *request() noexcept {
                 return &_request;
             }
 
-            std::string name() const {
+            std::string name() const noexcept {
                 switch((request_type)this->request()->type ) {
 #define XX( uc, lc ) case request_type::uc: return #uc;
                     UV_REQ_TYPE_MAP( XX )

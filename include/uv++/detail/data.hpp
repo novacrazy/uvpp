@@ -27,9 +27,9 @@ namespace uv {
             public:
                 typedef H handle_t;
 
-                virtual const handle_t *handle() const = 0;
+                virtual const handle_t *handle() const noexcept = 0;
 
-                virtual handle_t *handle() = 0;
+                virtual handle_t *handle() noexcept = 0;
 
                 inline std::shared_ptr<void> &data() {
                     HandleData *p = static_cast<HandleData *>(this->handle()->data);

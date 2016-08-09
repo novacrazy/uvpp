@@ -13,11 +13,11 @@ namespace uv {
             typedef typename Handle<uv_timer_t, Timer>::handle_t handle_t;
 
         protected:
-            inline void _init() {
+            inline void _init() noexcept {
                 uv_timer_init( this->_uv_loop, &_handle );
             }
 
-            inline void _stop() {
+            inline void _stop() noexcept {
                 uv_timer_stop( &_handle );
             }
 

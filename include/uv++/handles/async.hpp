@@ -33,11 +33,11 @@ namespace uv {
             typedef typename Handle<uv_async_t, Async>::handle_t handle_t;
 
         protected:
-            inline void _init() {
+            inline void _init() noexcept {
                 //No-op for uv_async_t
             }
 
-            inline void _stop() {
+            inline void _stop() noexcept {
                 //Also a no-op for uv_async_t
             }
 
