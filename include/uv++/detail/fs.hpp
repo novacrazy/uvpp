@@ -148,10 +148,10 @@ inline std::basic_ostream<_Char> &operator<<( std::basic_ostream<_Char> &out, co
            ctime = chrono::system_clock::to_time_t( s.ctime()),
            btime = chrono::system_clock::to_time_t( s.birthtime());
 
-    tm *atime_tm = gmtime( &atime ),
-       *mtime_tm = gmtime( &mtime ),
-       *ctime_tm = gmtime( &ctime ),
-       *btime_tm = gmtime( &btime );
+    tm *atime_tm = localtime( &atime ),
+       *mtime_tm = localtime( &mtime ),
+       *ctime_tm = localtime( &ctime ),
+       *btime_tm = localtime( &btime );
 
     bool   special = false;
     string type;
@@ -204,26 +204,26 @@ inline std::basic_ostream<_Char> &operator<<( std::basic_ostream<_Char> &out, co
         << left << setw( 8 ) << "Blocks: " << left << setw( max_width ) << s.st_blocks
         << left << setw( 8 ) << "IO Blocks: " << s.st_blksize << "   " << type;
 
-    out << endl;
+    out << '\n';
 
     out << right << setw( 8 ) << "Device: " << left << setw( max_width ) << device_str
         << left << setw( 8 ) << "Inode: " << left << setw( max_width ) << s.st_ino
         << left << setw( 11 ) << "Links: " << s.st_nlink;
 
-    out << endl;
+    out << '\n';
 
     out << right << setw( 8 ) << "Access: (0" << oct << ( s.st_mode & all_modes ) << '/' << s.permissions() << left << setw( perm_width ) << ")"
         << left << setw( 8 ) << "Uid: " << left << setw( max_width ) << s.st_uid
         << left << setw( 11 ) << "Gid: " << s.st_gid;
 
-    out << endl;
+    out << '\n';
 
-    out << right << setw( 8 ) << "Access: " << put_time( atime_tm, dformat ) << '.' << s.st_atim.tv_nsec << put_time( atime_tm, " %z" ) << endl;
-    out << right << setw( 8 ) << "Modify: " << put_time( mtime_tm, dformat ) << '.' << s.st_mtim.tv_nsec << put_time( mtime_tm, " %z" ) << endl;
-    out << right << setw( 8 ) << "Change: " << put_time( ctime_tm, dformat ) << '.' << s.st_ctim.tv_nsec << put_time( ctime_tm, " %z" ) << endl;
-    out << right << setw( 8 ) << "Birth: " << put_time( btime_tm, dformat ) << '.' << s.st_birthtim.tv_nsec << put_time( btime_tm, " %z" ) << endl;
+    out << right << setw( 8 ) << "Access: " << put_time( atime_tm, dformat ) << '.' << s.st_atim.tv_nsec << put_time( atime_tm, " %z" ) << '\n';
+    out << right << setw( 8 ) << "Modify: " << put_time( mtime_tm, dformat ) << '.' << s.st_mtim.tv_nsec << put_time( mtime_tm, " %z" ) << '\n';
+    out << right << setw( 8 ) << "Change: " << put_time( ctime_tm, dformat ) << '.' << s.st_ctim.tv_nsec << put_time( ctime_tm, " %z" ) << '\n';
+    out << right << setw( 8 ) << "Birth: " << put_time( btime_tm, dformat ) << '.' << s.st_birthtim.tv_nsec << put_time( btime_tm, " %z" ) << '\n';
 
-    return out;
+    return out << flush;
 }
 
 #endif
