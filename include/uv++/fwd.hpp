@@ -35,14 +35,35 @@ namespace uv {
 
     class Signal;
 
-    class Filesystem;
-
-    class File;
-
     template <typename, typename>
     class Request;
 
     class Work;
+
+    class MultiWork;
+
+    namespace fs {
+        class File;
+
+        class Stat;
+
+        class Filesystem;
+
+        class FSRequest;
+
+        template <typename>
+        class FSResult;
+    }
+
+    namespace os {
+        struct cpu_info_t;
+
+        struct passwd_t;
+    }
+
+    namespace net {
+        struct interface_t;
+    }
 }
 
 #endif //UV_FWD_HPP
