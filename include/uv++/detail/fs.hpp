@@ -61,7 +61,7 @@ namespace uv {
                     return S_ISSOCK( this->st_mode );
 #else
 # ifndef S_IFSOCK
-#  define S_IFSOCK 0x222E0 //libuv does not provide this, though
+#  define S_IFSOCK 0140000 //libuv does not provide this, though
 # endif
                     return ( this->st_mode & S_IFMT ) == S_IFSOCK;
 #endif
@@ -143,7 +143,11 @@ template <typename _Char>
 inline std::basic_ostream<_Char> &operator<<( std::basic_ostream<_Char> &out, const uv::fs::Stat &s ) noexcept {
     using namespace std;
 
-    constexpr auto all_modes = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH | S_IWOTH | S_IXOTH;
+#ifndef S_ISVTX
+# define S_ISVTX 07000
+#endif
+
+    constexpr auto all_modes = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH | S_IWOTH | S_IXOTH | S_ISVTX;
 
     constexpr const char *dformat = "%Y-%m-%d %H:%M:%S";
 
@@ -216,7 +220,8 @@ inline std::basic_ostream<_Char> &operator<<( std::basic_ostream<_Char> &out, co
 
     out << '\n';
 
-    out << right << setw( 8 ) << "Access: (0" << oct << ( s.st_mode & all_modes ) << '/' << s.permissions() << left << setw( perm_width ) << ")"
+    out << right << setw( 8 ) << "Access: (" << setfill( '0' ) << setw( 4 ) << oct << ( s.st_mode & all_modes ) << '/' << s.permissions()
+        << left << setfill( ' ' ) << setw( perm_width ) << ")"
         << left << setw( 8 ) << "Uid: " << left << setw( max_width ) << s.st_uid
         << left << setw( 10 ) << "Gid: " << s.st_gid;
 
