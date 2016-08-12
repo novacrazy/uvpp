@@ -83,7 +83,7 @@ namespace uv {
                     buf[6] = "-x"[( this->st_mode & S_IXGRP) != 0];
                     buf[7] = "-r"[( this->st_mode & S_IROTH) != 0];
                     buf[8] = "-w"[( this->st_mode & S_IWOTH) != 0];
-                    buf[8] = "-x"[( this->st_mode & S_IXOTH) != 0];
+                    buf[9] = "-x"[( this->st_mode & S_IXOTH) != 0];
 
                     return buf;
                 }
