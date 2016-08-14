@@ -7,6 +7,8 @@ The github name is uvpp because github didn't like uv++ as the repository name. 
 
 ## HEAVILY WORK IN PROGRESS!
 
+Currently working on converting raw pointers for relational data to smart pointers, mostly `shared_ptr` and `weak_ptr`. I haven't decided the best way to cleanup all loose handles and the event loop when everything is destroyed.
+
 ### Example
 
 You might notice the use of `.get()` for async operations; that's because uv++ uses `promise`s, `future`s, and `shared_future`s for asynchronous results.
