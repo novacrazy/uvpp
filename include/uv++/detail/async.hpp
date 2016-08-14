@@ -65,8 +65,6 @@ namespace uv {
             typedef typename AsyncContinuationBase<Functor, Self>::tuple_type  tuple_type;
             typedef typename AsyncContinuationBase<Functor, Self>::result_type result_type;
 
-            typedef ContinuationNeedsSelf<Functor, Self> needs_self;
-
             inline AsyncContinuation( Functor f ) noexcept
                 : AsyncContinuationBase<Functor, Self>( f ) {
             }
@@ -103,7 +101,7 @@ namespace uv {
             inline typename std::enable_if<
                 std::is_same<T, Self>::value &&
                 ContinuationNeedsSelf<Functor, T>::value, std::shared_future<result_type>>::type
-            init( T *self, Args &&... args ) {
+            init( std::shared_ptr<T> self, Args &&... args ) {
                 this->p = std::make_shared<tuple_type>( self, std::forward<Args>( args )... );
 
                 return this->base_init();
@@ -113,7 +111,7 @@ namespace uv {
             inline typename std::enable_if<
                 std::is_same<T, Self>::value &&
                 !ContinuationNeedsSelf<Functor, T>::value, std::shared_future<result_type>>::type
-            init( T *self, Args &&... args ) {
+            init( std::shared_ptr<T>, Args &&... args ) {
                 this->p = std::make_shared<tuple_type>( std::forward<Args>( args )... );
 
                 return this->base_init();
@@ -157,7 +155,7 @@ namespace uv {
             }
 
             template <typename T, typename... Args>
-            inline std::shared_future<result_type> init( T * ) {
+            inline std::shared_future<result_type> init( std::shared_ptr<T> ) {
                 return this->base_init();
             }
         };

@@ -8,6 +8,7 @@
 #include "defines.hpp"
 
 #include <iosfwd>
+#include <memory>
 
 namespace uv {
     class Exception;
@@ -66,7 +67,7 @@ namespace uv {
     }
 
     template <typename... Args>
-    inline UV_DECLTYPE_AUTO schedule( Loop *, Args... );
+    inline UV_DECLTYPE_AUTO schedule( std::shared_ptr<Loop>, Args... );
 }
 
 #endif //UV_FWD_HPP

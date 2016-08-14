@@ -7,7 +7,6 @@
 
 #include "../fwd.hpp"
 
-#include <memory>
 #include <type_traits>
 
 namespace uv {

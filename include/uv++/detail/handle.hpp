@@ -13,7 +13,6 @@
 #include <csignal>
 #include <cstring>
 
-#include <memory>
 #include <string>
 #include <algorithm>
 
@@ -24,7 +23,7 @@
 namespace uv {
     namespace detail {
         template <typename Functor, typename Self>
-        using ContinuationNeedsSelf = first_arg_is<Functor, typename std::add_pointer<Self>::type>;
+        using ContinuationNeedsSelf = first_arg_is<Functor, std::shared_ptr<Self>>;
 
         template <typename Functor, typename Self, bool needs_self = ContinuationNeedsSelf<Functor, Self>::value>
         struct Continuation : public std::enable_shared_from_this<Continuation<Functor, Self, needs_self>> {
@@ -34,7 +33,7 @@ namespace uv {
             inline Continuation( Functor _f ) noexcept : f( _f ) {}
 
             template <typename... Args>
-            inline UV_DECLTYPE_AUTO dispatch( Self *self, Args... args ) {
+            inline UV_DECLTYPE_AUTO dispatch( std::shared_ptr<Self> self, Args... args ) {
                 return this->f( self, std::forward<Args>( args )... );
             }
         };
@@ -48,7 +47,7 @@ namespace uv {
             inline Continuation( Functor _f ) noexcept : f( _f ) {}
 
             template <typename... Args>
-            inline UV_DECLTYPE_AUTO dispatch( Self *self, Args... args ) {
+            inline UV_DECLTYPE_AUTO dispatch( std::shared_ptr<Self>, Args... args ) {
                 return this->f( std::forward<Args>( args )... );
             }
         };
