@@ -44,6 +44,10 @@ namespace uv {
                         throw ::uv::Exception( "Owning loop has been destroyed" );
                     }
                 }
+
+                inline bool has_loop() const noexcept {
+                    return !this->_parent_loop.expired();
+                }
         };
     }
 }
