@@ -25,9 +25,9 @@ namespace uv {
                 uv_loop_t *loop_handle();
 
             public:
-                std::thread::id loop_thread() const noexcept;
+                std::thread::id loop_thread() const;
 
-                inline std::shared_ptr<Loop> loop() noexcept {
+                std::shared_ptr<Loop> loop() {
                     if( auto l = this->_parent_loop.lock()) {
                         return l;
 
@@ -36,7 +36,7 @@ namespace uv {
                     }
                 }
 
-                inline const std::shared_ptr<Loop> loop() const noexcept {
+                const std::shared_ptr<Loop> loop() const {
                     if( auto l = this->_parent_loop.lock()) {
                         return l;
 
