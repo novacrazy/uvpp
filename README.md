@@ -7,7 +7,9 @@ The github name is uvpp because github didn't like uv++ as the repository name. 
 
 ## HEAVILY WORK IN PROGRESS!
 
-Currently working on converting raw pointers for relational data to smart pointers, mostly `shared_ptr` and `weak_ptr`. I haven't decided the best way to cleanup all loose handles and the event loop when everything is destroyed.
+Currently working on a predictable way of managing the lifetimes of the event loop, handles, requests, etc., automatically.
+
+My current idea is to base everything off the lifetime of the event loop object. When it is destroyed, it should take all allocated handles with it. But it's a bit more complicated than that.
 
 ### Example
 
