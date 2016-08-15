@@ -43,7 +43,7 @@ namespace uv {
             typedef typename detail::function_traits<Functor>::result_type result_type;
             typedef typename detail::function_traits<Functor>::tuple_type  tuple_type;
 
-            std::shared_ptr<std::promise<result_type>>       r;
+            std::unique_ptr<std::promise<result_type>>       r;
             std::shared_ptr<std::shared_future<result_type>> s;
 
             inline AsyncContinuationBase( Functor f ) noexcept
@@ -52,7 +52,7 @@ namespace uv {
 
             inline std::shared_future<result_type> base_init() {
                 if( !this->r ) {
-                    this->r = std::make_shared<std::promise<result_type>>();
+                    this->r = std::make_unique<std::promise<result_type>>();
                     this->s = std::make_shared<std::shared_future<result_type>>( this->r->get_future());
                 }
 
@@ -69,7 +69,7 @@ namespace uv {
                 : AsyncContinuationBase<Functor, Self>( f ) {
             }
 
-            std::shared_ptr<tuple_type> p;
+            std::unique_ptr<tuple_type> p;
 
             inline void dispatch() {
                 dispatch_helper<result_type>::dispatch( *this->r, this->f, std::move( *this->p ));
@@ -101,8 +101,8 @@ namespace uv {
             inline typename std::enable_if<
                 std::is_same<T, Self>::value &&
                 ContinuationNeedsSelf<Functor, T>::value, std::shared_future<result_type>>::type
-            init( std::shared_ptr<T> self, Args &&... args ) {
-                this->p = std::make_shared<tuple_type>( self, std::forward<Args>( args )... );
+            init( std::shared_ptr<T> &&self, Args &&... args ) {
+                this->p = std::make_unique<tuple_type>( std::move( self ), std::forward<Args>( args )... );
 
                 return this->base_init();
             }
@@ -111,8 +111,8 @@ namespace uv {
             inline typename std::enable_if<
                 std::is_same<T, Self>::value &&
                 !ContinuationNeedsSelf<Functor, T>::value, std::shared_future<result_type>>::type
-            init( std::shared_ptr<T>, Args &&... args ) {
-                this->p = std::make_shared<tuple_type>( std::forward<Args>( args )... );
+            init( std::shared_ptr<T> &&, Args &&... args ) {
+                this->p = std::make_unique<tuple_type>( std::forward<Args>( args )... );
 
                 return this->base_init();
             }
@@ -155,7 +155,7 @@ namespace uv {
             }
 
             template <typename T, typename... Args>
-            inline std::shared_future<result_type> init( std::shared_ptr<T> ) {
+            inline std::shared_future<result_type> init( std::shared_ptr<T> && ) {
                 return this->base_init();
             }
         };
