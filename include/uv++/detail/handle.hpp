@@ -5,7 +5,7 @@
 #ifndef UV_HANDLE_DETAIL_HPP
 #define UV_HANDLE_DETAIL_HPP
 
-#include "base.hpp"
+#include "from_loop.hpp"
 #include "type_traits.hpp"
 #include "function_traits.hpp"
 

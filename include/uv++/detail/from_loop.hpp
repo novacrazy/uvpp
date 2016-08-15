@@ -2,8 +2,8 @@
 // Created by Aaron on 8/6/2016.
 //
 
-#ifndef UV_BASE_HPP
-#define UV_BASE_HPP
+#ifndef UV_FROM_LOOP_DETAIL_HPP
+#define UV_FROM_LOOP_DETAIL_HPP
 
 #include "../fwd.hpp"
 #include "../exception.hpp"
@@ -14,12 +14,12 @@ namespace uv {
     namespace detail {
         class FromLoop {
             protected:
-                std::weak_ptr<Loop> _parent_loop;
+                std::weak_ptr<Loop> parent_loop;
 
                 inline void _loop_init( std::shared_ptr<Loop> l ) noexcept {
                     assert( bool(l));
 
-                    this->_parent_loop = l;
+                    this->parent_loop = l;
                 }
 
                 uv_loop_t *loop_handle();
@@ -27,8 +27,10 @@ namespace uv {
             public:
                 std::thread::id loop_thread() const;
 
+                bool on_loop_thread() const;
+
                 std::shared_ptr<Loop> loop() {
-                    if( auto l = this->_parent_loop.lock()) {
+                    if( auto l = this->parent_loop.lock()) {
                         return l;
 
                     } else {
@@ -37,7 +39,7 @@ namespace uv {
                 }
 
                 const std::shared_ptr<Loop> loop() const {
-                    if( auto l = this->_parent_loop.lock()) {
+                    if( auto l = this->parent_loop.lock()) {
                         return l;
 
                     } else {
@@ -46,10 +48,10 @@ namespace uv {
                 }
 
                 inline bool has_loop() const noexcept {
-                    return !this->_parent_loop.expired();
+                    return !this->parent_loop.expired();
                 }
         };
     }
 }
 
-#endif //UV_BASE_HPP
+#endif //UV_FROM_LOOP_DETAIL_HPP
