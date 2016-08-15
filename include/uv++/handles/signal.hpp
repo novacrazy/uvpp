@@ -14,12 +14,14 @@ namespace uv {
             typedef typename Handle<uv_signal_t, Signal>::handle_t handle_t;
 
         protected:
+            typedef typename Handle<uv_signal_t, Signal>::HandleData HandleData;
+
             void _init() noexcept {
-                uv_signal_init( this->_uv_loop, &_handle );
+                uv_signal_init( this->loop_handle(), this->handle());
             }
 
             void _stop() noexcept {
-                uv_signal_stop( &_handle );
+                uv_signal_stop( this->handle());
             }
 
         public:
@@ -27,14 +29,21 @@ namespace uv {
             inline void start( int signum, Functor f ) {
                 typedef detail::Continuation<Functor, Signal> Cont;
 
-                this->internal_data.continuation = std::make_shared<Cont>( f );
+                this->internal_data->continuation = std::make_shared<Cont>( f );
 
                 uv_signal_start( this->handle(), []( uv_signal_t *h, int sn ) {
-                    HandleData *d = static_cast<HandleData *>(h->data);
+                    std::weak_ptr<HandleData> *d = static_cast<std::weak_ptr<HandleData> *>(h->data);
 
-                    Signal *self = static_cast<Signal *>(d->self);
+                    if( d != nullptr ) {
+                        if( auto data = d->lock()) {
+                            if( auto self = data->self.lock()) {
+                                data->cont<Cont>()->dispatch( self, sn );
+                            }
 
-                    static_cast<Cont *>(d->continuation.get())->dispatch( self, sn );
+                        } else {
+                            HandleData::cleanup( h, d );
+                        }
+                    }
                 }, signum );
             }
 

@@ -14,59 +14,88 @@
 #include <future>
 
 namespace uv {
-    struct HandleData : detail::UserData {
+    template <typename H, typename D>
+    struct HandleDataT : detail::UserData {
+        /*
+         * Shared pointers are used for these because of their type-erased deleters.
+         * */
+
         //For primary continuation of callbacks
         std::shared_ptr<void> continuation;
 
         //Only used for close callbacks
         std::shared_ptr<void> close_continuation;
 
-        void *self;
+        /*
+         * This is kept here to ensure a circular reference between the handle and the handle data
+         * */
+        std::shared_ptr<H> handle;
 
-        HandleData( void *s ) noexcept
-            : self( s ) {
-            assert( s != nullptr );
+        /*
+         * This is weak, because even if the handle data is still alive (via the above reference), it's okay
+         * for the owning Handle object to be destroyed.
+         * */
+        std::weak_ptr<D> self;
+
+        /*
+         * These are just here to make continuation code cleaner at usage sites
+         * */
+
+        template <typename Cont>
+        inline Cont *cont() {
+            return static_cast<Cont *>(this->continuation.get());
+        }
+
+        template <typename Cont>
+        inline Cont *close_cont() {
+            return static_cast<Cont *>(this->close_continuation.get());
+        }
+
+        inline static void cleanup( H *h, std::weak_ptr<HandleDataT> *t ) {
+            assert( h != nullptr );
+            assert( t != nullptr );
+
+            delete t;
+            h->data = nullptr;
+        }
+
+        HandleDataT( std::shared_ptr<D> s, std::shared_ptr<H> h )
+            : self( s ), handle( h ) {
         }
     };
 
     template <typename H, typename D>
     class HandleBase : public std::enable_shared_from_this<D>,
-                       public detail::UserDataAccess<HandleData, H>,
+                       public detail::UserDataAccess<HandleDataT<H, D>, H>,
                        public detail::FromLoop {
         public:
-            typedef typename detail::UserDataAccess<HandleData, H>::handle_t handle_t;
-            typedef D                                                        derived_type;
+            typedef typename detail::UserDataAccess<HandleDataT<H, D>, H>::handle_t   handle_t;
+            typedef D                                                                 derived_type;
+            typedef typename detail::UserDataAccess<HandleDataT<H, D>, H>::HandleData HandleData;
 
         protected:
-            HandleData internal_data;
+            std::shared_ptr<HandleData> internal_data;
+            std::shared_ptr<handle_t>   _handle;
+            std::atomic_bool            closing;
 
             //Implemented in derived classes
             virtual void _init() = 0;
 
             virtual void _stop() = 0;
 
-            //This is just for initializing things in the Loop class
-            inline void init( Loop *l, uv_loop_t *ul ) noexcept {
-                this->_loop_init( l, ul );
-
-                this->handle()->data = &this->internal_data;
-
-                this->_init();
-            }
-
         public:
-            inline HandleBase() noexcept
-                : internal_data( this ) {}
-
-            inline void init( Loop *l ) noexcept {
+            inline void init( std::shared_ptr<Loop> l ) {
                 this->_loop_init( l );
 
-                this->handle()->data = &this->internal_data;
+                this->internal_data = std::make_shared<HandleData>( std::static_pointer_cast<derived_type>( this->shared_from_this()), this->_handle );
+
+                this->handle()->data = new std::weak_ptr<HandleData>( this->internal_data );
 
                 this->_init();
             }
 
             void stop() {
+                //TODO: Remove thread restriction
                 assert( std::this_thread::get_id() == this->loop_thread());
 
                 this->_stop();
@@ -82,6 +111,7 @@ namespace uv {
         public:
             typedef typename HandleBase<H, D>::handle_t     handle_t;
             typedef typename HandleBase<H, D>::derived_type derived_type;
+            typedef typename HandleBase<H, D>::HandleData   HandleData;
 
             enum class handle_kind : std::underlying_type<uv_handle_type>::type {
                     UNKNOWN_HANDLE = 0,
@@ -92,18 +122,17 @@ namespace uv {
                     HANDLE_TYPE_MAX
             };
 
-
-        protected:
-            handle_t         _handle;
-            std::atomic_bool closing;
-
         public:
+            Handle() {
+                this->_handle = std::make_shared<handle_t>();
+            }
+
             inline const handle_t *handle() const noexcept {
-                return &_handle;
+                return this->_handle.get();
             }
 
             inline handle_t *handle() noexcept {
-                return &_handle;
+                return this->_handle.get();
             }
 
             inline bool is_active() const noexcept {

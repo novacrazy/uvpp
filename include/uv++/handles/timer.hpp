@@ -13,12 +13,14 @@ namespace uv {
             typedef typename Handle<uv_timer_t, Timer>::handle_t handle_t;
 
         protected:
+            typedef typename Handle<uv_timer_t, Timer>::HandleData HandleData;
+
             inline void _init() noexcept {
-                uv_timer_init( this->_uv_loop, &_handle );
+                uv_timer_init( this->loop_handle(), this->handle());
             }
 
             inline void _stop() noexcept {
-                uv_timer_stop( &_handle );
+                uv_timer_stop( this->handle());
             }
 
         public:
@@ -35,19 +37,23 @@ namespace uv {
 
                 typedef detail::Continuation<Functor, Timer> Cont;
 
-                this->internal_data.continuation = std::make_shared<Cont>( f );
+                this->internal_data->continuation = std::make_shared<Cont>( f );
 
                 uv_timer_start( this->handle(), []( uv_timer_t *h ) {
-                                    HandleData *d = static_cast<HandleData *>(h->data);
+                    std::weak_ptr<HandleData> *d = static_cast<std::weak_ptr<HandleData> *>(h->data);
 
-                                    Timer *self = static_cast<Timer *>(d->self);
+                    if( d != nullptr ) {
+                        if( auto data = d->lock()) {
+                            if( auto self = data->self.lock()) {
+                                data->cont<Cont>()->dispatch( self );
+                            }
 
-                                    static_cast<Cont *>(d->continuation.get())->dispatch( self );
-                                },
+                        } else {
+                            HandleData::cleanup( h, d );
+                        }
+                    }
                     //libuv expects milliseconds, so convert any duration given to milliseconds
-                                std::chrono::duration_cast<millis>( timeout ).count(),
-                                std::chrono::duration_cast<millis>( repeat ).count()
-                );
+                }, std::chrono::duration_cast<millis>( timeout ).count(), std::chrono::duration_cast<millis>( repeat ).count());
             }
     };
 }

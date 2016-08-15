@@ -33,6 +33,8 @@ namespace uv {
             typedef typename Handle<uv_async_t, Async>::handle_t handle_t;
 
         protected:
+            typedef typename Handle<uv_async_t, Async>::HandleData HandleData;
+
             inline void _init() noexcept {
                 //No-op for uv_async_t
             }
@@ -51,6 +53,8 @@ namespace uv {
             typedef typename Async::handle_t handle_t;
 
         protected:
+            typedef typename Handle<uv_async_t, AsyncDetail<Functor>>::HandleData HandleData;
+
             std::mutex m;
 
             typedef detail::AsyncContinuation<Functor, Async> Continuation;
@@ -67,27 +71,32 @@ namespace uv {
 
         public:
             inline void start( Functor f ) {
-                this->internal_data.continuation = std::make_shared<Continuation>( f );
+                this->internal_data->continuation = std::make_shared<Continuation>( f );
 
                 this->is_sending = false;
 
-                uv_async_init( this->_uv_loop, this->handle(), []( uv_async_t *h ) {
-                    HandleData *d = static_cast<HandleData *>(h->data);
+                uv_async_init( this->loop_handle(), this->handle(), []( uv_async_t *h ) {
+                    if( h->data != nullptr ) {
+                        std::weak_ptr<HandleData> *d = static_cast<std::weak_ptr<HandleData> *>(h->data);
 
-                    auto *self = static_cast<AsyncDetail<Functor> *>(d->self);
+                        if( auto data = d->lock()) {
+                            if( auto self = data->self.lock()) {
+                                std::lock_guard<std::mutex> lock( self->m );
 
-                    std::lock_guard<std::mutex> lock( self->m );
+                                if( self->closing ) {
+                                    data->template cont<Continuation>()->set_exception( ::uv::Exception( "async handle has been closed" ));
 
-                    Continuation *c = static_cast<Continuation *>(d->continuation.get());
+                                } else {
+                                    data->template cont<Continuation>()->dispatch();
+                                }
 
-                    if( self->closing ) {
-                        c->set_exception( ::uv::Exception( "async handle has been closed" ));
+                                self->is_sending = false;
+                            }
 
-                    } else {
-                        c->dispatch();
+                        } else {
+                            HandleData::cleanup( h, d );
+                        }
                     }
-
-                    self->is_sending = false;
                 } );
             }
 
@@ -112,9 +121,9 @@ namespace uv {
 
                     this->is_sending.compare_exchange_strong( expect_sending, true );
 
-                    Continuation *c = static_cast<Continuation *>(this->internal_data.continuation.get());
+                    Continuation *c = this->internal_data->template cont<Continuation>();
 
-                    auto ret = c->init( static_cast<Async *>(this), std::forward<Args>( args )... );
+                    auto ret = c->init( std::static_pointer_cast<Async>( this->shared_from_this()), std::forward<Args>( args )... );
 
                     /*
                      * So even with the mutex and stuff above, there is a slight chance libuv will still occasionally

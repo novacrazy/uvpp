@@ -51,6 +51,8 @@ namespace uv {
             typedef typename Request<uv_work_t, Work>::request_t request_t;
 
         protected:
+            typedef typename Request<uv_work_t, Work>::RequestData RequestData;
+
             inline void _init() noexcept {
                 //No-op
             }
@@ -62,41 +64,52 @@ namespace uv {
         private:
             template <typename Cont>
             void do_queue() {
-                uv_queue_work( this->_uv_loop, this->request(), []( uv_work_t *w ) {
-                    RequestData *d = static_cast<RequestData *>(w->data);
+                uv_queue_work( this->loop_handle(), this->request(), []( uv_work_t *w ) {
+                    std::weak_ptr<RequestData> *d = static_cast<std::weak_ptr<RequestData> *>(w->data);
 
-                    Work *self = static_cast<Work *>(d->self);
+                    if( d != nullptr ) {
+                        if( auto data = d->lock()) {
+                            if( auto self = data->self.lock()) {
+                                int expect_pending = REQUEST_PENDING;
 
-                    int expect_pending = REQUEST_PENDING;
+                                self->_status.compare_exchange_strong( expect_pending, REQUEST_ACTIVE );
 
-                    self->_status.compare_exchange_strong( expect_pending, REQUEST_ACTIVE );
+                                if( expect_pending == REQUEST_PENDING ) {
+                                    data->cont<Cont>()->dispatch();
+                                }
+                            }
 
-                    if( expect_pending == REQUEST_PENDING ) {
-                        Cont *sc = static_cast<Cont *>(d->continuation.get());
-
-                        sc->dispatch();
+                        } else {
+                            RequestData::cleanup( w, d );
+                        }
                     }
 
                 }, []( uv_work_t *w, int status ) {
-                    RequestData *d = static_cast<RequestData *>(w->data);
+                    std::weak_ptr<RequestData> *d = static_cast<std::weak_ptr<RequestData> *>(w->data);
 
-                    Work *self = static_cast<Work *>(d->self);
+                    if( d != nullptr ) {
+                        if( auto data = d->lock()) {
+                            if( auto self = data->self.lock()) {
+                                int expect_active = REQUEST_ACTIVE;
 
-                    int expect_active = REQUEST_ACTIVE;
+                                self->_status.compare_exchange_strong( expect_active, REQUEST_FINISHED );
 
-                    self->_status.compare_exchange_strong( expect_active, REQUEST_FINISHED );
+                                auto sc = data->cont<Cont>();
 
-                    Cont *sc = static_cast<Cont *>(d->continuation.get());
+                                if( status != 0 ) {
+                                    sc->finished.set_exception( std::make_exception_ptr( ::uv::Exception( status )));
 
-                    if( status != 0 ) {
-                        sc->finished.set_exception( std::make_exception_ptr( ::uv::Exception( status )));
+                                } else if( expect_active != REQUEST_ACTIVE ) {
+                                    //TODO: Better error message on this
+                                    sc->finished.set_exception( std::make_exception_ptr( ::uv::Exception( "invalid state" )));
 
-                    } else if( expect_active != REQUEST_ACTIVE ) {
-                        //TODO: Better error message on this
-                        sc->finished.set_exception( std::make_exception_ptr( ::uv::Exception( "invalid state" )));
-
-                    } else {
-                        sc->finished.set_value();
+                                } else {
+                                    sc->finished.set_value();
+                                }
+                            }
+                        } else {
+                            RequestData::cleanup( w, d );
+                        }
                     }
                 } );
             }
@@ -135,12 +148,12 @@ namespace uv {
                 } else {
                     auto c = std::make_shared<Cont>( f );
 
-                    this->internal_data.continuation = c;
+                    c->init( this->shared_from_this(), std::forward<Args>( args )... );
 
-                    c->init( this, std::forward<Args>( args )... );
+                    this->internal_data->continuation = c;
 
                     if( last_status != REQUEST_PENDING ) {
-                        if( std::this_thread::get_id() != this->loop_thread()) {
+                        if( !this->on_loop_thread()) {
                             schedule( this->loop(), [this] {
                                 this->do_queue<Cont>();
                             } );

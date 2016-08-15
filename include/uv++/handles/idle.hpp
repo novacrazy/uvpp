@@ -13,12 +13,14 @@ namespace uv {
             typedef typename Handle<uv_idle_t, Idle>::handle_t handle_t;
 
         protected:
+            typedef typename Handle<uv_idle_t, Idle>::HandleData HandleData;
+
             inline void _init() noexcept {
-                uv_idle_init( this->_uv_loop, &_handle );
+                uv_idle_init( this->loop_handle(), this->handle());
             }
 
             inline void _stop() noexcept {
-                uv_idle_stop( &_handle );
+                uv_idle_stop( this->handle());
             }
 
         public:
@@ -26,14 +28,21 @@ namespace uv {
             inline void start( Functor f ) {
                 typedef detail::Continuation<Functor, Idle> Cont;
 
-                this->internal_data.continuation = std::make_shared<Cont>( f );
+                this->internal_data->continuation = std::make_shared<Cont>( f );
 
                 uv_idle_start( this->handle(), []( uv_idle_t *h ) {
-                    HandleData *d = static_cast<HandleData *>(h->data);
+                    std::weak_ptr<HandleData> *d = static_cast<std::weak_ptr<HandleData> *>(h->data);
 
-                    Idle *self = static_cast<Idle *>(d->self);
+                    if( d != nullptr ) {
+                        if( auto data = d->lock()) {
+                            if( auto self = data->self.lock()) {
+                                data->cont<Cont>()->dispatch( self );
+                            }
 
-                    static_cast<Cont *>(d->continuation.get())->dispatch( self );
+                        } else {
+                            HandleData::cleanup( h, d );
+                        }
+                    }
                 } );
             }
     };

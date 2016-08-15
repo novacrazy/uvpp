@@ -42,44 +42,58 @@ namespace uv {
 
                     auto r = std::make_shared<std::promise<request_t *>>();
 
-                    this->internal_data.continuation = r;
+                    this->internal_data->continuation = r;
 
-                    schedule( this->loop(), [uf, this]( Args... inner_args ) -> void {
-                        uf( this->_uv_loop, this->request(), std::forward<Args>( inner_args )..., []( uv_fs_t *req ) {
-                            RequestData *d = static_cast<RequestData *>(req->data);
+                    auto cb = [uf, this]( Args... inner_args ) -> void {
+                        uf( this->loop_handle(), this->request(), std::forward<Args>( inner_args )..., []( uv_fs_t *req ) {
+                            std::weak_ptr<RequestData> *d = static_cast<std::weak_ptr<RequestData> *>(req->data);
 
-                            FSRequest *self = static_cast<FSRequest *>(d->self);
+                            if( d != nullptr ) {
+                                if( auto data = d->lock()) {
+                                    if( auto self = data->self.lock()) {
+                                        int expect_pending = REQUEST_PENDING;
 
-                            int expect_pending = REQUEST_PENDING;
+                                        self->_status.compare_exchange_strong( expect_pending, REQUEST_FINISHED );
 
-                            self->_status.compare_exchange_strong( expect_pending, REQUEST_FINISHED );
+                                        auto *p = static_cast<std::promise<request_t *> *>(data->continuation.get());
 
-                            auto *p = static_cast<std::promise<request_t *> *>(d->continuation.get());
+                                        if( expect_pending == REQUEST_PENDING ) {
+                                            int res = (int)req->result;
 
-                            if( expect_pending == REQUEST_PENDING ) {
-                                int res = (int)req->result;
+                                            if( res < 0 ) {
+                                                uv_fs_req_cleanup( req );
 
-                                if( res < 0 ) {
-                                    uv_fs_req_cleanup( req );
+                                                p->set_exception( std::make_exception_ptr( ::uv::Exception( res )));
 
-                                    p->set_exception( std::make_exception_ptr( ::uv::Exception( res )));
+                                            } else {
+                                                p->set_value( req );
+                                            }
+
+                                        } else {
+                                            uv_fs_req_cleanup( req );
+
+                                            if( expect_pending == REQUEST_CANCELLED ) {
+                                                p->set_exception( std::make_exception_ptr( ::uv::Exception( UV_ECANCELED )));
+
+                                            } else {
+                                                p->set_exception( std::make_exception_ptr( ::uv::Exception( UV_UNKNOWN )));
+                                            }
+                                        }
+                                    }
 
                                 } else {
-                                    p->set_value( req );
-                                }
-
-                            } else {
-                                uv_fs_req_cleanup( req );
-
-                                if( expect_pending == REQUEST_CANCELLED ) {
-                                    p->set_exception( std::make_exception_ptr( ::uv::Exception( UV_ECANCELED )));
-
-                                } else {
-                                    p->set_exception( std::make_exception_ptr( ::uv::Exception( UV_UNKNOWN )));
+                                    RequestData::cleanup( req, d );
                                 }
                             }
                         } );
-                    }, std::forward<Args>( args )... );
+                    };
+
+                    if( this->on_loop_thread()) {
+                        cb( std::forward<Args>( args )... );
+
+                    } else {
+                        schedule( this->loop(), cb, std::forward<Args>( args )... );
+                    }
 
                     return r->get_future();
                 }

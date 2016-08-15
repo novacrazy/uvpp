@@ -11,6 +11,7 @@
 
 #include <thread>
 #include <unordered_set>
+#include <unordered_map>
 #include <iomanip>
 
 #ifndef UV_DEFAULT_LOOP_SLEEP
@@ -62,9 +63,12 @@ namespace uv {
 
             std::atomic_bool stopped, has_ran;
 
-            typedef std::unordered_set<std::shared_ptr<void>>         handle_set_type;
-            handle_set_type                                           handle_set;
-            std::mutex                                                handle_set_mutex;
+            typedef std::unordered_map<void *, std::weak_ptr<void>> weak_handle_map;
+            typedef std::unordered_set<std::shared_ptr<void>>       handle_set;
+
+            weak_handle_map                                           weak_handles;
+            handle_set                                                handles;
+            std::mutex                                                handle_mutex;
 
             typedef detail::TrivialPair<void *, void ( * )( void * )> scheduled_task;
 
@@ -103,9 +107,9 @@ namespace uv {
                     }
 #endif
                     this->update_time();
-                } );
+                }, true ); //Use weak reference since we're storing this one separately
 
-                this->_fs = std::make_shared<fs::Filesystem>( this );
+                this->_fs = fs::Filesystem::make_filesystem( this->shared_from_this());
             }
 
             inline void _stop() {
@@ -116,29 +120,48 @@ namespace uv {
 
         public:
             inline const handle_t *handle() const noexcept {
-                return _uv_loop;
+                return _handle.get();
             }
 
             inline handle_t *handle() noexcept {
-                return _uv_loop;
+                return _handle.get();
             }
 
-            inline Loop()
-                : external( false ), _loop_thread( std::this_thread::get_id())
+        private:
+            explicit inline Loop()
+                : _loop_thread( std::this_thread::get_id())
 #ifdef UV_USE_BOOST_LOCKFREE
                 , task_queue( UV_LOCKFREE_QUEUE_SIZE )
 #endif
-            {
-                this->init( this, new handle_t );
-            }
+            {}
 
-            explicit inline Loop( handle_t *l )
-                : external( true ), _loop_thread( std::this_thread::get_id())
-#ifdef UV_USE_BOOST_LOCKFREE
-                , task_queue( UV_LOCKFREE_QUEUE_SIZE )
-#endif
-            {
-                this->init( this, l );
+        public:
+            Loop( const Loop & ) = delete;
+
+            //TODO: Figure out move semantics with atomic values
+            //Loop( Loop && ) = delete;
+
+            static inline std::shared_ptr<Loop> make_loop( handle_t *l = nullptr ) {
+                auto loop = std::shared_ptr<Loop>( new Loop());
+
+                if( l == nullptr ) {
+                    loop->_handle = std::make_shared<handle_t>();
+
+                } else {
+
+                    struct no_deleter {
+                        void operator()( handle_t *p ) const {
+                        };
+                    };
+
+                    loop->_handle = std::shared_ptr<handle_t>( l, no_deleter());
+
+                    loop->external = true;
+                }
+
+                loop->init( loop->shared_from_this());
+
+                return loop;
             }
 
             inline std::shared_ptr<fs::Filesystem> fs() noexcept {
@@ -152,12 +175,11 @@ namespace uv {
 
                 this->has_ran = true;
 
-                return uv_run( handle(), (uv_run_mode)( mode ));
+                return uv_run( this->handle(), (uv_run_mode)( mode ));
             }
 
             template <typename _Rep, typename _Period>
-            void
-            run_forever( const std::chrono::duration<_Rep, _Period> &delay, run_mode mode = RUN_DEFAULT ) noexcept {
+            void run_forever( const std::chrono::duration<_Rep, _Period> &delay, run_mode mode = RUN_DEFAULT ) noexcept {
                 this->stopped = false;
 
 #ifdef UV_DETRACT_LOOP
@@ -245,6 +267,15 @@ namespace uv {
                 uv_update_time( handle());
             }
 
+            void cleanup() {
+                std::lock_guard<std::mutex> lock( this->handle_mutex );
+
+                //TODO: Convert this to explicit loop
+                //std::remove_if( this->weak_handles.begin(), this->weak_handles.end(), []( const weak_handle_map::value_type &p ) -> bool {
+                //    return p.second.expired();
+                //} );
+            }
+
             //returns true on closed
             inline bool try_close( int *resptr = nullptr ) noexcept {
                 assert( std::this_thread::get_id() == this->loop_thread());
@@ -278,30 +309,39 @@ namespace uv {
 
         protected:
             template <typename H, typename... Args>
-            std::shared_ptr<H> new_handle( bool requires_loop_thread, Args... args ) {
-                std::lock_guard<std::mutex> lock( this->handle_set_mutex );
+            std::shared_ptr<H> new_handle( bool requires_loop_thread, bool weak, Args... args ) {
+                //The mutex prevents multiple initializations that affect the event loop at the same time
+                std::lock_guard<std::mutex> lock( this->handle_mutex );
 
-                if( this->has_ran && requires_loop_thread && this->loop_thread() != std::this_thread::get_id()) {
+                if( this->has_ran && requires_loop_thread && !this->on_loop_thread()) {
                     /*
                      * If the new_handle request is not on the loop thread, block until everything is initialized there
                      *
                      * Not the best solution, but it just has to wait it's turn I guess. **shrugs**
                      * */
-                    return this->schedule( []( Loop *self, Args... inner_args ) {
+                    return this->schedule( []( std::shared_ptr<Loop> self, bool inner_weak, Args... inner_args ) {
                         assert( self->loop_thread() == std::this_thread::get_id());
 
-                        return self->new_handle<H>( false, std::forward<Args>( inner_args )... );
-                    }, std::forward<Args>( args )... ).get();
+                        return self->new_handle<H>( false, inner_weak, std::forward<Args>( inner_args )... );
+                    }, weak, std::forward<Args>( args )... ).get();
 
                 } else {
                     std::shared_ptr<H> p = std::make_shared<H>();
 
-                    auto it_inserted = handle_set.insert( p );
+                    if( weak ) {
+                        auto it_inserted = weak_handles.emplace( weak_handle_map::value_type{ p.get(), std::weak_ptr<void>( p ) } );
 
-                    //There should be no collisions for new pointers, but yeah
-                    assert( it_inserted.second );
+                        //There should be no collisions for new pointers, but yeah
+                        assert( it_inserted.second );
 
-                    p->init( this );
+                    } else {
+                        auto it_inserted = handles.insert( p );
+
+                        //There should be no collisions for new pointers, but yeah
+                        assert( it_inserted.second );
+                    }
+
+                    p->init( this->shared_from_this());
 
                     p->start( std::forward<Args>( args )... );
 
@@ -312,17 +352,17 @@ namespace uv {
         public:
             template <typename Functor>
             inline std::shared_ptr<Idle> idle( Functor f ) {
-                return new_handle<Idle>( true, f );
+                return new_handle<Idle>( true, false, f );
             }
 
             template <typename Functor>
             inline std::shared_ptr<Prepare> prepare( Functor f ) {
-                return new_handle<Prepare>( true, f );
+                return new_handle<Prepare>( true, false, f );
             }
 
             template <typename Functor>
             inline std::shared_ptr<Check> check( Functor f ) {
-                return new_handle<Check>( true, f );
+                return new_handle<Check>( true, false, f );
             }
 
             template <typename Functor,
@@ -332,8 +372,9 @@ namespace uv {
                                                  const std::chrono::duration<_Rep, _Period> &timeout,
                                                  const std::chrono::duration<_Rep2, _Period2> &repeat =
                                                  std::chrono::duration<_Rep2, _Period2>(
-                                                     std::chrono::duration_values<_Rep2>::zero())) {
-                return new_handle<Timer>( true, f, timeout, repeat );
+                                                     std::chrono::duration_values<_Rep2>::zero()),
+                                                 bool weak = false ) {
+                return new_handle<Timer>( true, weak, f, timeout, repeat );
             }
 
             template <typename Functor,
@@ -343,8 +384,9 @@ namespace uv {
                                                   const std::chrono::duration<_Rep, _Period> &repeat,
                                                   const std::chrono::duration<_Rep2, _Period2> &timeout =
                                                   std::chrono::duration<_Rep2, _Period2>(
-                                                      std::chrono::duration_values<_Rep2>::zero())) {
-                return this->timer( f, timeout, repeat );
+                                                      std::chrono::duration_values<_Rep2>::zero()),
+                                                  bool weak = false ) {
+                return this->timer( f, timeout, repeat, weak );
             }
 
             template <typename Functor,
@@ -352,8 +394,8 @@ namespace uv {
                       typename _Rep2, typename _Period2>
             inline std::shared_ptr<Timer> timer( const std::chrono::duration<_Rep, _Period> &timeout,
                                                  const std::chrono::duration<_Rep2, _Period2> &repeat,
-                                                 Functor f ) {
-                return this->timer( f, timeout, repeat );
+                                                 Functor f, bool weak = false ) {
+                return this->timer( f, timeout, repeat, weak );
             }
 
             template <typename Functor,
@@ -363,8 +405,9 @@ namespace uv {
                                                  Functor f,
                                                  const std::chrono::duration<_Rep2, _Period2> &repeat =
                                                  std::chrono::duration<_Rep2, _Period2>(
-                                                     std::chrono::duration_values<_Rep2>::zero())) {
-                return this->timer( f, timeout, repeat );
+                                                     std::chrono::duration_values<_Rep2>::zero()),
+                                                 bool weak = false ) {
+                return this->timer( f, timeout, repeat, weak );
             }
 
             template <typename Functor,
@@ -374,8 +417,9 @@ namespace uv {
                                                   Functor f,
                                                   const std::chrono::duration<_Rep2, _Period2> &timeout =
                                                   std::chrono::duration<_Rep2, _Period2>(
-                                                      std::chrono::duration_values<_Rep2>::zero())) {
-                return this->timer( f, timeout, repeat );
+                                                      std::chrono::duration_values<_Rep2>::zero()),
+                                                  bool weak = false ) {
+                return this->timer( f, timeout, repeat, weak );
             }
 
             template <typename... Args>
@@ -389,13 +433,13 @@ namespace uv {
             }
 
             template <typename Functor>
-            inline std::shared_ptr<AsyncDetail<Functor>> async( Functor f ) {
-                return new_handle<AsyncDetail<Functor>>( true, f );
+            inline std::shared_ptr<AsyncDetail<Functor>> async( Functor f, bool weak = false ) {
+                return new_handle<AsyncDetail<Functor>>( true, weak, f );
             }
 
             template <typename Functor>
             inline std::shared_ptr<Signal> signal( int signal, Functor f ) {
-                return new_handle<Signal>( true, signal, f );
+                return new_handle<Signal>( true, false, signal, f );
             }
 
             template <typename Functor, typename... Args>
@@ -404,7 +448,7 @@ namespace uv {
 
                 Cont *c = new Cont( f );
 
-                auto ret = c->init( this, std::forward<Args>( args )... );
+                auto ret = c->init( this->shared_from_this(), std::forward<Args>( args )... );
 
                 scheduled_task t{ c, []( void *vc ) {
                     Cont *sc = static_cast<Cont *>(vc);
@@ -429,9 +473,9 @@ namespace uv {
                 return ret;
             }
 
-            inline std::shared_ptr<Work> work() {
+            inline std::shared_ptr<Work> work( bool weak = false ) {
                 //Work is special since it doesn't initialize on the loop thread
-                return new_handle<Work>( false );
+                return new_handle<Work>( false, weak );
             };
 
             /*
@@ -502,14 +546,22 @@ namespace uv {
             }
     };
 
-    inline std::thread::id detail::FromLoop::loop_thread() const noexcept {
-        return this->loop()->_loop_thread;
-    };
-
     namespace detail {
+        inline uv_loop_t *FromLoop::loop_handle() {
+            return this->loop()->handle();
+        }
+
+        inline std::thread::id FromLoop::loop_thread() const {
+            return this->loop()->_loop_thread;
+        };
+
+        inline bool FromLoop::on_loop_thread() const {
+            return this->loop_thread() == std::this_thread::get_id();
+        }
+
         struct DefaultLoop : LazyStatic<std::shared_ptr<Loop>> {
             std::shared_ptr<Loop> init() {
-                return std::make_shared<Loop>( uv_default_loop());
+                return Loop::make_loop( uv_default_loop());
             }
         };
 
@@ -518,10 +570,6 @@ namespace uv {
 
     inline std::shared_ptr<Loop> default_loop() {
         return detail::default_loop;
-    }
-
-    inline void detail::FromLoop::_loop_init( Loop *l ) noexcept {
-        this->_loop_init( l, l->handle());
     }
 
     template <typename H, typename D>
@@ -545,27 +593,34 @@ namespace uv {
         } else {
             auto c = std::make_shared<Cont>( f );
 
-            this->internal_data.close_continuation = c;
+            auto ret = c->init( this->shared_from_this());
 
-            auto ret = c->init( this );
+            this->internal_data->close_continuation = c;
 
             auto cb = []( uv_handle_t *h ) {
-                HandleData *d = static_cast<HandleData *>(h->data);
+                std::weak_ptr<HandleData> *d = static_cast<std::weak_ptr<HandleData> *>(h->data);
 
-                auto sc = std::static_pointer_cast<Cont>( d->close_continuation );
+                if( d != nullptr ) {
+                    if( auto data = d->lock()) {
+                        if( auto self = data->self.lock()) {
+                            data->template close_cont<Cont>()->dispatch();
 
-                sc->dispatch();
+                            data->close_continuation.reset();
+                        }
 
-                d->close_continuation.reset();
+                    } else {
+                        HandleData::cleanup( reinterpret_cast<H *>( h ), d );
+                    }
+                }
             };
 
-            if( std::this_thread::get_id() != this->loop()->loop_thread()) {
+            if( this->on_loop_thread()) {
+                uv_close((uv_handle_t *)this->handle(), cb );
+
+            } else {
                 this->loop()->schedule( [this, cb] {
                     uv_close((uv_handle_t *)this->handle(), cb );
                 } );
-
-            } else {
-                uv_close((uv_handle_t *)this->handle(), cb );
             }
 
             return ret;
@@ -573,7 +628,7 @@ namespace uv {
     }
 
     template <typename... Args>
-    inline UV_DECLTYPE_AUTO schedule( Loop *l, Args... args ) {
+    inline UV_DECLTYPE_AUTO schedule( std::shared_ptr<Loop> l, Args... args ) {
         return l->schedule( std::forward<Args>( args )... );
     }
 }

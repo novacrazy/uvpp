@@ -14,24 +14,54 @@
 #include <atomic>
 
 namespace uv {
-    struct RequestData : detail::UserData {
+    template <typename R, typename D>
+    struct RequestDataT : detail::UserData {
+        /*
+         * Shared pointers are used for this because of their type-erased deleters.
+         * */
         std::shared_ptr<void> continuation;
 
-        void *self;
+        /*
+         * This is kept here to ensure a circular reference between the handle and the handle data
+         * */
+        std::shared_ptr<R> request;
 
-        RequestData( void *s )
-            : self( s ) {
-            assert( s != nullptr );
+        /*
+         * This is weak, because even if the handle data is still alive (via the above reference), it's okay
+         * for the owning Handle object to be destroyed.
+         * */
+        std::weak_ptr<D> self;
+
+        /*
+         * These are just here to make continuation code cleaner at usage sites
+         * */
+
+        template <typename Cont>
+        inline Cont *cont() {
+            return static_cast<Cont *>(this->continuation.get());
+        }
+
+        inline static void cleanup( R *r, std::weak_ptr<RequestDataT> *t ) {
+            assert( r != nullptr );
+            assert( t != nullptr );
+
+            delete t;
+            r->data = nullptr;
+        }
+
+        RequestDataT( std::shared_ptr<D> s, std::shared_ptr<R> r )
+            : self( s ), request( r ) {
         }
     };
 
     template <typename R, typename D>
     class Request : public std::enable_shared_from_this<Request<R, D>>,
-                    public detail::UserDataAccess<RequestData, R>,
+                    public detail::UserDataAccess<RequestDataT<R, D>, R>,
                     public detail::FromLoop {
         public:
-            typedef typename detail::UserDataAccess<RequestData, R>::handle_t request_t;
-            typedef D                                                         derived_type;
+            typedef typename detail::UserDataAccess<RequestDataT<R, D>, R>::handle_t   request_t;
+            typedef D                                                                  derived_type;
+            typedef typename detail::UserDataAccess<RequestDataT<R, D>, R>::HandleData RequestData;
 
             enum class request_kind : std::underlying_type<uv_req_type>::type {
                     UNKNOWN_REQ = 0,
@@ -58,10 +88,10 @@ namespace uv {
             };
 
         protected:
-            RequestData internal_data;
+            std::shared_ptr<RequestData> internal_data;
 
-            request_t       _request;
-            std::atomic_int _status;
+            std::shared_ptr<request_t> _request;
+            std::atomic_int            _status;
 
             //Implemented in derived classes
             virtual void _init() = 0;
@@ -79,19 +109,22 @@ namespace uv {
 
         public:
             inline Request() noexcept
-                : internal_data( this ), _status( REQUEST_IDLE ) {
+                : _request( new request_t ),
+                  _status( REQUEST_IDLE ) {
             }
 
-            inline void init( Loop *l ) {
+            inline void init( std::shared_ptr<Loop> l ) {
                 this->_loop_init( l );
 
-                this->handle()->data = &this->internal_data;
+                this->internal_data = std::make_shared<RequestData>( std::static_pointer_cast<derived_type>( this->shared_from_this()), this->_request );
+
+                this->handle()->data = new std::weak_ptr<RequestData>( this->internal_data );
 
                 this->_init();
             }
 
             inline std::shared_future<void> cancel() {
-                if( std::this_thread::get_id() == this->loop_thread()) {
+                if( this->on_loop_thread()) {
                     if( this->_status == REQUEST_ACTIVE ) {
                         return detail::make_exception_future<void>( ::uv::Exception( UV_EBUSY ));
 
@@ -144,11 +177,11 @@ namespace uv {
             }
 
             inline const request_t *request() const noexcept {
-                return &_request;
+                return _request.get();
             }
 
             inline request_t *request() noexcept {
-                return &_request;
+                return _request.get();
             }
 
             std::string name() const noexcept {
@@ -167,6 +200,10 @@ namespace uv {
                     default:
                         return "UNKNOWN_REQ";
                 }
+            }
+
+            ~Request() {
+
             }
     };
 }
