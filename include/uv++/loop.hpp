@@ -89,7 +89,7 @@ namespace uv {
                 }
 
                 this->schedule_async = this->async( [this] {
-                    assert( std::this_thread::get_id() == this->loop_thread());
+                    assert( this->on_loop_thread());
 
 #ifdef UV_USE_BOOST_LOCKFREE
                     this->task_queue.consume_all( [this]( scheduled_task &task ) {
@@ -232,7 +232,7 @@ namespace uv {
             template <typename... Args>
             typename std::enable_if<detail::all_type<uv_loop_option, Args...>::value, Loop &>::type
             configure( Args &&... args ) {
-                assert( std::this_thread::get_id() == this->loop_thread());
+                assert( this->on_loop_thread());
 
                 auto res = uv_loop_configure( this->handle(), std::forward<Args>( args )... );
 
@@ -248,13 +248,13 @@ namespace uv {
             }
 
             inline int backend_fd() const noexcept {
-                assert( std::this_thread::get_id() == this->loop_thread());
+                assert( this->on_loop_thread());
 
                 return uv_backend_fd( handle());
             }
 
             inline int backend_timeout() const noexcept {
-                assert( std::this_thread::get_id() == this->loop_thread());
+                assert( this->on_loop_thread());
 
                 return uv_backend_timeout( handle());
             }
@@ -278,7 +278,7 @@ namespace uv {
 
             //returns true on closed
             inline bool try_close( int *resptr = nullptr ) noexcept {
-                assert( std::this_thread::get_id() == this->loop_thread());
+                assert( this->on_loop_thread());
 
                 int res = uv_loop_close( this->handle());
 
@@ -320,7 +320,7 @@ namespace uv {
                      * Not the best solution, but it just has to wait it's turn I guess. **shrugs**
                      * */
                     return this->schedule( []( std::shared_ptr<Loop> self, bool inner_weak, Args... inner_args ) {
-                        assert( self->loop_thread() == std::this_thread::get_id());
+                        assert( this->on_loop_thread());
 
                         return self->new_handle<H>( false, inner_weak, std::forward<Args>( inner_args )... );
                     }, weak, std::forward<Args>( args )... ).get();
@@ -487,7 +487,7 @@ namespace uv {
             void print_handles( std::basic_ostream<_Char> &out, bool only_active = false ) const noexcept {
                 typedef void *UV_QUEUE[2];
 
-                assert( std::this_thread::get_id() == this->loop_thread());
+                assert( this->on_loop_thread());
 #ifndef _WIN32
                 enum {
                   UV__HANDLE_INTERNAL = 0x8000,

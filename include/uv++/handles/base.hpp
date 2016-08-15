@@ -96,7 +96,7 @@ namespace uv {
 
             void stop() {
                 //TODO: Remove thread restriction
-                assert( std::this_thread::get_id() == this->loop_thread());
+                assert( this->on_loop_thread());
 
                 this->_stop();
             }
