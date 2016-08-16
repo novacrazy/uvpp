@@ -44,7 +44,7 @@ namespace uv {
             typedef typename detail::function_traits<Functor>::tuple_type  tuple_type;
 
             std::unique_ptr<std::promise<result_type>>       r;
-            std::shared_ptr<std::shared_future<result_type>> s;
+            std::unique_ptr<std::shared_future<result_type>> s;
 
             inline AsyncContinuationBase( Functor f ) noexcept
                 : Continuation<Functor, Self>( f ) {
@@ -53,7 +53,7 @@ namespace uv {
             inline std::shared_future<result_type> base_init() {
                 if( !this->r ) {
                     this->r = std::make_unique<std::promise<result_type>>();
-                    this->s = std::make_shared<std::shared_future<result_type>>( this->r->get_future());
+                    this->s = std::make_unique<std::shared_future<result_type>>( this->r->get_future());
                 }
 
                 return *this->s;
