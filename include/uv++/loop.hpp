@@ -320,7 +320,7 @@ namespace uv {
                      * Not the best solution, but it just has to wait it's turn I guess. **shrugs**
                      * */
                     return this->schedule( []( std::shared_ptr<Loop> self, bool inner_weak, Args... inner_args ) {
-                        assert( this->on_loop_thread());
+                        assert( self->on_loop_thread());
 
                         return self->new_handle<H>( false, inner_weak, std::forward<Args>( inner_args )... );
                     }, weak, std::forward<Args>( args )... ).get();
