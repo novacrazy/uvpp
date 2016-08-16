@@ -126,7 +126,7 @@ namespace uv {
             }
 
             template <typename Functor, typename... Args>
-            std::future<detail::result_of<Functor>> queue( Functor f, Args... args ) {
+            std::future<detail::fn_result_of<Functor>> queue( Functor f, Args... args ) {
                 typedef detail::function_traits<Functor>        ft;
                 typedef typename ft::result_type                result_type;
                 typedef detail::WorkContinuation<Functor, Work> Cont;
@@ -148,6 +148,8 @@ namespace uv {
                 } else {
                     auto c = std::make_shared<Cont>( f );
 
+                    auto result = *c->s;
+
                     c->init( this->shared_from_this(), std::forward<Args>( args )... );
 
                     this->internal_data->continuation = c;
@@ -163,15 +165,13 @@ namespace uv {
                         }
                     }
 
-                    auto result = c->s;
-
                     //I love this line. So succinct.
-                    return util::then( c->finished, [result] { return *result; }, UV_ASYNC_LAUNCH );
+                    return util::then( c->finished, [result] { return result; }, UV_ASYNC_LAUNCH );
                 }
             }
 
             template <typename Functor, typename... Args>
-            inline std::future<detail::result_of<Functor>> defer_queue( Functor f, Args... args ) {
+            inline std::future<detail::fn_result_of<Functor>> defer_queue( Functor f, Args... args ) {
                 return std::async( std::launch::deferred, [this]( Functor inner_f, Args &&... inner_args ) {
                     return this->queue( inner_f, std::forward<Args>( inner_args )... ).get();
                 }, f, std::forward<Args>( args )... );

@@ -158,7 +158,7 @@ namespace uv {
         };
 
         template <typename Functor>
-        using result_of = typename function_traits<Functor>::result_type;
+        using fn_result_of = typename function_traits<Functor>::result_type;
     }
 }
 
