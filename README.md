@@ -1,6 +1,8 @@
 uv++
 ====
 
+### This project is defunct and outdated. I would not recommend using it, but feel free to browse the code and steal anything useful.
+
 C++14 wrapper around libuv with an emphasis on simplicity and rapid development.
 
 The github name is uvpp because github didn't like uv++ as the repository name. This project has no affiliation with any other project named uvpp.
